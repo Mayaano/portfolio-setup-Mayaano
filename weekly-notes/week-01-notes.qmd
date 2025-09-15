@@ -4,20 +4,24 @@ date: "2025-09-08"
 ---
 
 ## Key Concepts Learned
-- [List main concepts from lecture]
-- [Technical skills covered]
+- Introduction to **Public Policy Analytics (MUSA 5080)** and course goals  
+- Importance of combining **spatial analysis** with **data science** for urban planning and policy  
+- Overview of course deliverables: weekly notes, labs, and final project  
+- Initial setup of the **RStudio + Quarto** environment for reproducible workflows  
 
 ## Coding Techniques
-- [New R functions or approaches]
-- [Quarto features learned]
+- Learned how to set the **working directory** in R (`setwd()`)  
+- Practiced creating and rendering a **Quarto (.qmd) document**  
+- Explored basic Quarto structure: YAML header, markdown formatting, and `render` function  
 
 ## Questions & Challenges
-- [What I didn't fully understand]
-- [Areas needing more practice]
+- Still clarifying the workflow between **RStudio** and **Quarto rendering** (e.g., where files are stored vs. rendered outputs)  
+- Need more practice with GitHub integration for publishing the portfolio  
 
 ## Connections to Policy
-- [How this week's content applies to real policy work]
+- Building reproducible workflows with R and Quarto ensures **transparency** and **credibility** in policy-related analysis  
+- Portfolio structure mirrors how real-world policy analysts document methods, results, and reflections  
 
 ## Reflection
-- [What was most interesting]
-- [How I'll apply this knowledge]
+- Most interesting: Seeing how quickly RStudio + Quarto can generate a **professional-looking portfolio website**  
+- Plan to apply: Use weekly notes to practice **explaining technical concepts** in plain language, which is critical for communicating with policymakers  
