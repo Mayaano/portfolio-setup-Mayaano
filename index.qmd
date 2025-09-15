@@ -4,20 +4,23 @@ title: "MUSA 5080 Portfolio"
 
 # Welcome to My Portfolio
 
-This portfolio documents my learning journey in Public Policy Analytics (MUSA 5080).
+This portfolio documents my learning journey in **Public Policy Analytics (MUSA 5080)**.  
+It will include weekly reflections, lab assignments, and a final project.
 
 ## About This Course
-Advanced spatial analysis and data science for urban planning and public policy.
+This course introduces advanced spatial analysis and data science for urban planning and public policy.  
+Through hands-on labs and projects, I will learn tools such as **R, dplyr, tidycensus, and Quarto** to analyze policy-relevant data.
 
 ## Portfolio Structure
-- **Weekly Notes:** My learning reflections and key concepts
-- **Labs:** Completed assignments and analyses
-- **Final Project:** Capstone modeling challenge
+- **Weekly Notes:** Reflections on learning, class takeaways, and key concepts  
+- **Labs:** Completed assignments and applied analyses  
+- **Final Project:** Capstone modeling challenge  
 
 ## About Me
-[Zhe Fang MUSA]
+- **Name:** Zhe Fang  
+- **Program:** MUSA, University of Pennsylvania  
+- **Interests:** Spatial data science, public policy, and analytics for decision-making  
 
 ## Contact
-- Email: [fang6@upenn.edu]
-- GitHub: [@Mayaano]
-No reason
+- Email: [fang6@upenn.edu](mailto:fang6@upenn.edu)  
+- GitHub: [@Mayaano](https://github.com/Mayaano)
