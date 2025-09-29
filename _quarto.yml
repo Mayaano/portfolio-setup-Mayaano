@@ -3,13 +3,17 @@ project:
   output-dir: docs
 
 website:
-  title: "Zhe Fang - MUSA 5080 Portfolio"
+  title: "Zhe Fang – MUSA 5080 Portfolio"
   navbar:
     left:
-      - href: index.qmd
-        text: Home
-      - href: weekly-notes/
-        text: Weekly Notes
+      - text: "Home"
+        href: index.qmd
+      - text: "Weekly Notes"
+        href: weekly-notes/
+      - text: "Assignments"
+        menu:
+          - text: "Assignment 1"
+            href: assignments/assignment1/
 
 format:
   html:
