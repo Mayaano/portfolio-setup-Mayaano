@@ -5,11 +5,9 @@ author: "Zhe Fang"
 date: today
 format: 
   html:
-    code-fold: false
-    toc: true
-    toc-location: left
     theme: cosmo
     toc: true
+    toc-location: left
     code-fold: true
     embed-resources: true
 execute:
