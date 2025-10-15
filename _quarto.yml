@@ -13,7 +13,9 @@ website:
       - text: "Assignments"
         menu:
           - text: "Assignment 1"
-            href: assignments/assignment1/
+            href: assignments/assignment1/assignment1.qmd
+          - text: "Assignment 2"
+            href: assignments/assignment2/assignment2.qmd
 
 format:
   html:
