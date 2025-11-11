@@ -1,0 +1,190 @@
+---
+title: "Assignment 1: Census Data Quality for Policy Decisions"
+subtitle: "Evaluating Data Reliability for Algorithmic Decision-Making"
+author: "Zhe Fang"
+date: today
+format: 
+  html:
+    code-fold: false
+    toc: true
+    toc-location: left
+    theme: cosmo
+execute:
+  warning: false
+  message: false
+---
+
+## Assignment Overview
+
+### Scenario
+
+You are a data analyst for the **Pennsylvania Department of Human Services**. The department is considering implementing an algorithmic system to identify communities that should receive priority for social service funding and outreach programs. Your supervisor has asked you to evaluate the quality and reliability of available census data to inform this decision.
+
+Drawing on our Week 2 discussion of algorithmic bias, you need to assess not just what the data shows, but how reliable it is and what communities might be affected by data quality issues.
+
+### Learning Objectives
+
+- Apply dplyr functions to real census data for policy analysis
+- Evaluate data quality using margins of error
+- Connect technical analysis to algorithmic decision-making
+- Identify potential equity implications of data reliability issues
+- Create professional documentation for policy stakeholders
+
+---
+
+## Part 1: Portfolio Integration
+
+This assignment has been integrated into my portfolio website at [Assignment 1 Page](https://mayaano.github.io/portfolio-setup-Mayaano/assignments/assignment1/).
+
+```{r}
+library(tidyverse)
+library(tidycensus)
+library(scales)
+library(RColorBrewer)
+
+census_api_key(Sys.getenv("CENSUS_API_KEY"), install = FALSE)
+
+acs_vars_2022 <- load_variables(2022, "acs5", cache = TRUE)
+head(acs_vars_2022)
+```
+
+---
+
+## Part 2: County-Level Resource Assessment
+
+```{r}
+vars <- c(
+  total_pop = "B01003_001",      
+  median_income = "B19013_001",  
+  median_age = "B01002_001"      
+)
+
+county_data <- get_acs(
+  geography = "county",
+  state = "PA",
+  variables = vars,
+  year = 2022
+)
+
+county_wide <- county_data %>%
+  select(GEOID, NAME, variable, estimate) %>%
+  pivot_wider(names_from = variable, values_from = estimate)
+
+head(county_wide)
+colnames(county_wide)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(scales)
+print(class(county_wide))
+print(head(county_wide))
+print(colnames(county_wide))
+
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(scales)
+
+county_wide <- county_wide %>%
+  mutate(NAME_short = gsub(", Pennsylvania", "", NAME))
+
+ggplot(county_wide, aes(x = reorder(NAME_short, median_income), y = median_income)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  scale_y_continuous(labels = dollar) +
+  labs(
+    title = "Median Household Income by County (PA, 2022)",
+    x = "County",
+    y = "Median Household Income"
+  ) +
+  theme(
+    axis.text.y = element_text(size = 5),   
+    plot.title = element_text(hjust = 0.5)  
+  )
+
+
+```
+
+---
+
+## Part 3: Neighborhood-Level Analysis
+
+```{r}
+tract_data <- get_acs(
+  geography = "tract",
+  state = "PA",
+  county = "Philadelphia",
+  variables = vars,
+  year = 2022
+)
+
+tract_wide <- tract_data %>%
+  select(GEOID, NAME, variable, estimate) %>%
+  pivot_wider(names_from = variable, values_from = estimate)
+
+head(tract_wide)
+```
+
+```{r}
+# Histogram of tract-level median income
+ggplot(tract_wide, aes(x = median_income)) +
+  geom_histogram(fill = "darkgreen", bins = 30, alpha = 0.7) +
+  scale_x_continuous(labels = dollar) +
+  labs(title = "Distribution of Median Household Income by Tract",
+       x = "Median Household Income", y = "Count of Tracts")
+```
+
+---
+
+## Part 4: Comprehensive Data Quality Evaluation
+
+```{r}
+tract_eval <- tract_data %>%
+  mutate(cv = moe / estimate) %>%
+  group_by(variable) %>%
+  summarize(
+    avg_cv = mean(cv, na.rm = TRUE),
+    high_moe = sum(cv > 0.15, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+tract_eval
+```
+
+```{r}
+# Boxplot of coefficients of variation by variable
+tract_data %>%
+  mutate(cv = moe / estimate) %>%
+  ggplot(aes(x = variable, y = cv, fill = variable)) +
+  geom_boxplot() +
+  scale_y_continuous(labels = percent) +
+  labs(title = "Coefficient of Variation by Variable",
+       x = "Variable", y = "Coefficient of Variation (MOE/Estimate)") +
+  theme_minimal()
+```
+
+---
+
+## Part 5: Policy Recommendations
+
+The analysis shows that census data quality varies across geographies. County-level indicators are generally reliable, but tract-level indicators, especially median income, often have higher margins of error. Communities with smaller populations tend to have less precise estimates, raising risks of inequitable resource allocation.
+
+**Recommendations:**
+
+1. Use county-level data when feasible for stable decision-making.  
+2. For tract-level analyses, flag areas with CV > 15% as less reliable.  
+3. Supplement ACS estimates with administrative records or surveys for high-uncertainty tracts.  
+4. Document uncertainty in reports so stakeholders understand the limits of the data.  
+5. Monitor outcomes if algorithms are deployed, to ensure disadvantaged communities are not further marginalized.  
+
+---
+
+## Technical Notes
+
+- ACS 5-year estimates (2022) were used.  
+- All analyses conducted in R with the `tidycensus` and `tidyverse` packages.  
+- Census API key stored securely via environment variable.  

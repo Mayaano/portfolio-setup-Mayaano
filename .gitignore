@@ -1,3 +1,37 @@
 /.quarto/
 **/*.quarto_ipynb
 .Rproj.user
+
+# R temporary files
+.RData
+.RDataTmp
+.Rhistory
+
+# Ignore R session files
+.RData
+.RDataTmp
+.Rhistory
+
+# Ignore large and temporary files
+*.RData
+*.RDataTmp
+*.Rhistory
+*.geojson
+*.csv
+*.tif
+*.shp
+*.dbf
+*.prj
+*.shx
+
+# Ignore large and temporary files
+*.RData
+*.RDataTmp
+*.Rhistory
+*.geojson
+*.csv
+*.tif
+*.shp
+*.dbf
+*.prj
+*.shx

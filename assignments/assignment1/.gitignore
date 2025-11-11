@@ -1,0 +1,5 @@
+
+# R temp files
+.RData
+.RDataTmp
+.Rhistory
