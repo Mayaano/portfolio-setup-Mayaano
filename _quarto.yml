@@ -16,7 +16,8 @@ website:
             href: assignments/assignment1/assignment1.qmd
           - text: "Assignment 2"
             href: assignments/assignment2/Fang_Zhe_Assignment2.qmd
-
+          - text: "Assignment 4"
+            href: assignments/assignment4/Fang_Zhe_Assignment4.qmd
 format:
   html:
     theme: cosmo

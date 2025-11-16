@@ -1,0 +1,21 @@
+Hi everyone,
+
+Happy Thursday. Several clarifications:
+
+We don't accept resubmission or re-grading requests for assignments that have already been submitted and graded. All grades are final after posting. Please always double-check your work before submitting, make sure your code is working, and the link is working. (You can submit multiple times before the Deadline.)
+As previously announced, you will not get full credit if you don't incorporate the feedback for assignments 4 and 5. You don't need to worry about feedback regarding specific charts or maps. The comprehensive checklist before submitting is attached below. 
+The comprehensive list of common offenses is as follows (must be avoided):
+
+Remove extra instruction text in your future homework, such as “Complete the following analysis, documenting each step……”
+Make sure you only print stuff in your report for readers. For example, do not print the output from st_read()/st_crs(), nor first rows of a table that's just for your own reference.
+Do not display your personal API Key in a public document.
+While it's ok to use some help with the code, make sure you do understand your code.
+You can make your answers look cleaner by rounding your numbers to 2 digits using the round() function.
+Please pay attention to the formatting of your report. Header levels are mistakenly given to text, which makes your contents list on the left very chaotic and hard to navigate.
+Please pay more attention to formatting in your answers. Start a new line for each new question/answer.
+Use theme_void() to get rid of tick marks on maps.
+If you are unsure or have questions, please email your TAs or instructors! See y'all next Monday! Thanks.
+
+Best regards,
+
+Zhanchao

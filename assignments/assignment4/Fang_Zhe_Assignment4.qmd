@@ -1,0 +1,909 @@
+---
+title: "Spatial Predictive Analysis of Sanitation Code Violations"
+subtitle: "Assignment 4 - MUSA 5080"
+author: "Fang Zhe"
+date: today
+format:
+  html:
+    code-fold: show
+    code-tools: true
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    theme: cosmo
+    embed-resources: true
+editor: visual
+execute:
+  warning: false
+  message: false
+---
+
+## Introduction
+
+This analysis examines the spatial distribution and predictive patterns of **Sanitation Code Violations** in Chicago during 2017. Sanitation code violations include complaints about garbage in yards and alleys, dog feces, and other environmental health concerns. 
+
+**Why Sanitation Code Violations?**
+
+I selected this 311 service request type because sanitation issues often indicate broader neighborhood conditions and may be spatially correlated with other urban problems. Understanding where these violations cluster can help the city allocate inspection resources more efficiently and identify neighborhoods that may need additional support.
+
+**Research Question:** Can we predict the spatial distribution of sanitation code violations using spatial features and count regression models?
+
+---
+
+# Setup
+
+```{r setup}
+#| message: false
+#| warning: false
+
+# Load required packages
+library(tidyverse)      # Data manipulation
+library(sf)             # Spatial operations
+library(here)           # Relative file paths
+library(viridis)        # Color scales
+library(terra)          # Raster operations
+library(spdep)          # Spatial dependence
+library(FNN)            # Fast nearest neighbors
+library(MASS)           # Negative binomial regression
+library(patchwork)      # Plot composition
+library(knitr)          # Tables
+library(kableExtra)     # Table formatting
+library(classInt)       # Classification intervals
+library(lubridate)      # Date handling
+
+# Spatstat for KDE
+library(spatstat.geom)    
+library(spatstat.explore) 
+
+# Set options
+options(scipen = 999)
+set.seed(5080)
+
+# Create visualization theme
+theme_map <- function() {
+  theme_void() +
+    theme(
+      plot.title = element_text(face = "bold", size = 12),
+      plot.subtitle = element_text(color = "gray30", size = 10),
+      legend.position = "right"
+    )
+}
+
+theme_set(theme_map())
+
+cat("✓ Packages loaded successfully\n")
+```
+
+---
+
+# Part 1: Data Loading & Exploration
+
+## Load Chicago Boundaries
+
+```{r load-boundaries}
+#| message: false
+#| output: false
+
+# Load police districts for cross-validation
+policeDistricts <- 
+  st_read("https://data.cityofchicago.org/api/geospatial/24zt-jpfn?method=export&format=GeoJSON") %>%
+  st_transform('ESRI:102271') %>%
+  dplyr::select(District = dist_num)
+
+# Load Chicago boundary
+chicagoBoundary <- 
+  st_read("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/DATA/Chapter5/chicagoBoundary.geojson") %>%
+  st_transform('ESRI:102271')
+```
+
+**What we're doing:** Loading the spatial boundaries of Chicago and its police districts. We use police districts for spatial cross-validation later.
+
+**Why this matters:** We need boundaries to constrain our analysis to Chicago and to create groups for validation.
+
+## Load Sanitation Violations Data
+
+```{r load-violations}
+# Load the downloaded data
+violations <- read_csv("data/311_Service_Requests_-_Sanitation_Code_Complaints_-_Historical_20251114.csv") %>%
+  # Convert to sf object
+  filter(!is.na(Latitude), !is.na(Longitude)) %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) %>%
+  st_transform('ESRI:102271') %>%
+  # Parse date
+  mutate(
+    creation_date = mdy(`Creation Date`),
+    year = year(creation_date)
+  ) %>%
+  # Keep only necessary columns
+  dplyr::select(
+    creation_date,
+    year,
+    status = Status,
+    violation_type = `What is the Nature of this Code Violation?`
+  )
+
+cat("✓ Loaded sanitation violations\n")
+cat("  - Total violations:", nrow(violations), "\n")
+cat("  - Date range:", min(violations$creation_date), "to", 
+    max(violations$creation_date), "\n")
+```
+
+**What we found:** The dataset contains `r nrow(violations)` sanitation code violations from 2017. These represent citizen complaints about various sanitation issues across Chicago.
+
+## Visualize Spatial Distribution
+
+```{r visualize-points}
+#| fig-width: 10
+#| fig-height: 5
+
+# Point map
+p1 <- ggplot() + 
+  geom_sf(data = chicagoBoundary, fill = "gray95", color = "gray60") +
+  geom_sf(data = violations, color = "#d62828", size = 0.1, alpha = 0.3) +
+  labs(
+    title = "Sanitation Code Violations",
+    subtitle = paste0("Chicago 2017, n = ", nrow(violations))
+  ) +
+  theme_map()
+
+# Density surface
+p2 <- ggplot() + 
+  geom_sf(data = chicagoBoundary, fill = "gray95", color = "gray60") +
+  geom_density_2d_filled(
+    data = data.frame(st_coordinates(violations)),
+    aes(X, Y),
+    alpha = 0.7,
+    bins = 8
+  ) +
+  scale_fill_viridis_d(
+    option = "plasma",
+    direction = -1,
+    guide = "none"
+  ) +
+  labs(
+    title = "Density Surface",
+    subtitle = "Higher concentrations in certain areas"
+  ) +
+  theme_map()
+
+p1 + p2
+```
+
+**What patterns do we observe?** 
+
+The sanitation code violations in Chicago are clearly not spread out at random. Instead, they form noticeable clusters—especially on the South Side and West Side. These areas show the strongest concentrations of violations, which stand out in the density map as dark-purple hot spots. In contrast, the North Side and much of the lakefront have far fewer recorded violations.
+This pattern lines up with broader neighborhood characteristics. Communities with more violations tend to have older housing, lower household incomes, and fewer resources available for property upkeep. The clustering suggests that these issues don’t happen in isolation but are connected to larger structural conditions, including the physical environment, local economic context, and even how enforcement may vary across neighborhoods.
+Because the violations are clearly clustered rather than randomly scattered, the data is well-suited for spatial prediction. The strong geographic patterns indicate that location and neighborhood context play an important role in explaining where violations occur.
+
+---
+
+# Part 2: Create Fishnet Grid
+
+## Create 500m x 500m Grid
+
+```{r create-fishnet}
+# Create fishnet grid
+fishnet <- st_make_grid(
+  chicagoBoundary,
+  cellsize = 500,
+  square = TRUE
+) %>%
+  st_sf() %>%
+  mutate(uniqueID = row_number())
+
+# Keep only cells intersecting Chicago
+fishnet <- fishnet[chicagoBoundary, ]
+
+cat("✓ Created fishnet grid\n")
+cat("  - Number of cells:", nrow(fishnet), "\n")
+cat("  - Cell size: 500 x 500 meters\n")
+```
+
+**Why use a fishnet grid?** 
+
+A regular grid allows us to:
+1. Aggregate point data into consistent spatial units
+2. Calculate spatial features at a uniform scale
+3. Apply count regression models (which require aggregated counts)
+
+This approach is more flexible than using administrative boundaries and ensures consistent spatial resolution across the study area.
+
+## Aggregate Violations to Grid
+
+```{r aggregate-violations}
+# Count violations per cell
+violations_fishnet <- st_join(violations, fishnet, join = st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID) %>%
+  summarize(countViolations = n())
+
+# Join back to fishnet
+fishnet <- fishnet %>%
+  left_join(violations_fishnet, by = "uniqueID") %>%
+  mutate(countViolations = replace_na(countViolations, 0))
+
+# Summary statistics
+cat("\nViolation count distribution:\n")
+summary(fishnet$countViolations)
+cat("\nCells with zero violations:", 
+    sum(fishnet$countViolations == 0), "/", nrow(fishnet),
+    "(", round(100 * sum(fishnet$countViolations == 0) / nrow(fishnet), 1), "%)\n")
+```
+
+```{r visualize-fishnet}
+#| fig-width: 8
+#| fig-height: 6
+
+ggplot() +
+  geom_sf(data = fishnet, aes(fill = countViolations), color = NA) +
+  geom_sf(data = chicagoBoundary, fill = NA, color = "white", linewidth = 1) +
+  scale_fill_viridis_c(
+    name = "Violations",
+    option = "plasma",
+    trans = "sqrt"
+  ) +
+  labs(
+    title = "Sanitation Code Violations by Grid Cell",
+    subtitle = "500m x 500m cells, Chicago 2017"
+  ) +
+  theme_map()
+```
+
+**What we observe:** 
+
+The aggregated fishnet reveals that sanitation violations are widespread but unevenly distributed. Out of 2,458 cells, only 576 (23.4%) have zero violations, meaning over three-quarters of Chicago experienced at least one sanitation complaint in 2017. 
+
+The distribution shows substantial variation. While many cells have just 1-3 violations, some hotspot cells contain significantly higher counts. This right-skewed distribution is typical for urban complaint data and suggests two things: (1) sanitation problems are a city-wide issue rather than isolated incidents, and (2) certain neighborhoods experience disproportionately high violation rates, likely tied to structural factors like housing age, property maintenance capacity, and enforcement patterns.
+
+The high variance across cells makes this data well-suited for count regression modeling, particularly Negative Binomial regression which can handle overdispersion.
+
+---
+
+# Part 3: Kernel Density Estimation Baseline
+
+Before building complex models, we create a simple baseline using Kernel Density Estimation (KDE). This represents our null hypothesis: violations occur where they occurred before, with no additional information.
+
+```{r kde-baseline}
+# Convert to point pattern
+violations_ppp <- as.ppp(
+  st_coordinates(violations),
+  W = as.owin(st_bbox(chicagoBoundary))
+)
+
+# Calculate KDE
+kde_violations <- density.ppp(
+  violations_ppp,
+  sigma = 1000,
+  edge = TRUE
+)
+
+# Convert to raster and extract to fishnet
+kde_raster <- rast(kde_violations)
+
+fishnet <- fishnet %>%
+  mutate(
+    kde_value = terra::extract(
+      kde_raster,
+      vect(fishnet),
+      fun = mean,
+      na.rm = TRUE
+    )[, 2]
+  )
+```
+
+```{r visualize-kde}
+#| fig-width: 8
+#| fig-height: 6
+
+ggplot() +
+  geom_sf(data = fishnet, aes(fill = kde_value), color = NA) +
+  geom_sf(data = chicagoBoundary, fill = NA, color = "white", linewidth = 1) +
+  scale_fill_viridis_c(
+    name = "KDE Value",
+    option = "plasma"
+  ) +
+  labs(
+    title = "Kernel Density Estimation Baseline",
+    subtitle = "Simple spatial smoothing - our benchmark"
+  ) +
+  theme_map()
+```
+
+**Why create a baseline?** 
+
+The KDE represents the simplest possible prediction: violations happen where they happened before. Our complex model must outperform this baseline to justify its added complexity. We'll compare back to this at the end.
+
+---
+
+# Part 4: Create Spatial Features
+
+Now we create features that might help predict violations. We'll use abandoned vehicle calls as a predictor, following the "broken windows theory" that physical disorder predicts other problems.
+
+## Load Abandoned Vehicle Data
+
+```{r load-abandoned-cars}
+#| message: false
+
+# Try to load from local file first (recommended)
+if (file.exists("data/abandoned_cars_2017.csv")) {
+  abandoned_cars <- read_csv("data/abandoned_cars_2017.csv") %>%
+    filter(!is.na(Latitude), !is.na(Longitude)) %>%
+    st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) %>%
+    st_transform('ESRI:102271')
+  cat("✓ Loaded from local file\n")
+} else {
+  # Fallback: Try API (may be slow or fail)
+  abandoned_cars <- read_csv("https://data.cityofchicago.org/resource/3c9v-pnva.csv?$limit=50000&$where=creation_date between '2017-01-01T00:00:00' and '2017-12-31T23:59:59'") %>%
+    filter(!is.na(latitude), !is.na(longitude)) %>%
+    st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
+    st_transform('ESRI:102271')
+  cat("✓ Loaded from API\n")
+}
+
+cat("  - Number of abandoned vehicle calls:", nrow(abandoned_cars), "\n")
+```
+
+**Why use abandoned vehicles as a predictor?**
+
+Following the "broken windows theory," physical signs of disorder (like abandoned vehicles) may predict other neighborhood problems. This variable tests whether disorder in one form (abandoned cars) correlates with disorder in another form (sanitation violations).
+
+## Count Abandoned Vehicles per Cell
+
+```{r count-abandoned-cars}
+# Aggregate to fishnet
+abandoned_fishnet <- st_join(abandoned_cars, fishnet, join = st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID) %>%
+  summarize(abandoned_cars = n())
+
+fishnet <- fishnet %>%
+  left_join(abandoned_fishnet, by = "uniqueID") %>%
+  mutate(abandoned_cars = replace_na(abandoned_cars, 0))
+
+summary(fishnet$abandoned_cars)
+```
+
+```{r compare-features}
+#| fig-width: 10
+#| fig-height: 4
+
+p1 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = abandoned_cars), color = NA) +
+  scale_fill_viridis_c(name = "Count", option = "magma") +
+  labs(title = "Abandoned Vehicle Calls") +
+  theme_map()
+
+p2 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = countViolations), color = NA) +
+  scale_fill_viridis_c(name = "Count", option = "plasma") +
+  labs(title = "Sanitation Violations") +
+  theme_map()
+
+p1 + p2 +
+  plot_annotation(
+    title = "Comparing Spatial Patterns",
+    subtitle = "Do these two phenomena co-occur?"
+  )
+```
+
+**Visual relationship:** 
+
+The side-by-side comparison reveals a strong visual correlation between abandoned vehicle calls and sanitation violations. Areas with high concentrations of abandoned cars—particularly on the South Side and West Side—also show elevated sanitation violation counts. This spatial overlap supports the "broken windows theory": visible signs of physical disorder (abandoned vehicles) tend to co-occur with other forms of neighborhood neglect (sanitation problems).
+
+However, the relationship isn't perfectly one-to-one. Some areas with moderate abandoned car counts still experience high sanitation violations, suggesting that other factors (housing density, property ownership patterns, or enforcement priorities) also play a role. This imperfect correlation justifies using abandoned cars as a predictor variable while recognizing it won't explain all the variation in sanitation complaints.]*
+
+## Calculate Nearest Neighbor Distances
+
+```{r nn-features}
+# Calculate mean distance to 3 nearest abandoned cars
+fishnet_coords <- st_coordinates(st_centroid(fishnet))
+abandoned_coords <- st_coordinates(abandoned_cars)
+
+nn_result <- get.knnx(abandoned_coords, fishnet_coords, k = 3)
+
+fishnet <- fishnet %>%
+  mutate(abandoned_cars.nn = rowMeans(nn_result$nn.dist))
+
+summary(fishnet$abandoned_cars.nn)
+```
+
+**What this feature captures:** 
+
+The average distance to the 3 nearest abandoned vehicle reports. A low value means a cell is surrounded by abandoned vehicles, suggesting neighborhood disorder. A high value means the cell is far from any abandoned vehicles.
+
+## Local Moran's I: Identify Hot Spots
+
+```{r local-morans}
+# Function to calculate Local Moran's I
+calculate_local_morans <- function(data, variable, k = 5) {
+  coords <- st_coordinates(st_centroid(data))
+  neighbors <- knn2nb(knearneigh(coords, k = k))
+  weights <- nb2listw(neighbors, style = "W", zero.policy = TRUE)
+  
+  local_moran <- localmoran(data[[variable]], weights)
+  mean_val <- mean(data[[variable]], na.rm = TRUE)
+  
+  data %>%
+    mutate(
+      local_i = local_moran[, 1],
+      p_value = local_moran[, 5],
+      is_significant = p_value < 0.05,
+      moran_class = case_when(
+        !is_significant ~ "Not Significant",
+        local_i > 0 & .data[[variable]] > mean_val ~ "High-High",
+        local_i > 0 & .data[[variable]] <= mean_val ~ "Low-Low",
+        local_i < 0 & .data[[variable]] > mean_val ~ "High-Low",
+        local_i < 0 & .data[[variable]] <= mean_val ~ "Low-High",
+        TRUE ~ "Not Significant"
+      )
+    )
+}
+
+# Apply to abandoned cars
+fishnet <- calculate_local_morans(fishnet, "abandoned_cars", k = 5)
+```
+
+```{r visualize-morans}
+#| fig-width: 8
+#| fig-height: 6
+
+ggplot() +
+  geom_sf(data = fishnet, aes(fill = moran_class), color = NA) +
+  scale_fill_manual(
+    values = c(
+      "High-High" = "#d7191c",
+      "High-Low" = "#fdae61",
+      "Low-High" = "#abd9e9",
+      "Low-Low" = "#2c7bb6",
+      "Not Significant" = "gray90"
+    ),
+    name = "Cluster Type"
+  ) +
+  labs(
+    title = "Local Moran's I: Abandoned Car Clusters",
+    subtitle = "High-High clusters = Hot spots of disorder"
+  ) +
+  theme_map()
+```
+
+**What is Local Moran's I?** 
+
+This statistic identifies spatial clusters:
+- **High-High (red):** Hot spots - high values surrounded by high values
+- **Low-Low (blue):** Cold spots - low values surrounded by low values
+- **High-Low / Low-High:** Spatial outliers
+- **Not Significant (gray):** Random spatial pattern
+
+This helps us understand where disorder is concentrated vs. where it's spatially random.
+
+## Distance to Hot Spots
+
+```{r distance-hotspots}
+# Get hot spot centroids
+hotspots <- fishnet %>%
+  filter(moran_class == "High-High") %>%
+  st_centroid()
+
+# Calculate distance to nearest hot spot
+if (nrow(hotspots) > 0) {
+  fishnet <- fishnet %>%
+    mutate(
+      dist_to_hotspot = as.numeric(
+        st_distance(st_centroid(fishnet), hotspots %>% st_union())
+      )
+    )
+  cat("✓ Calculated distance to hot spots\n")
+  cat("  - Number of hot spot cells:", nrow(hotspots), "\n")
+} else {
+  fishnet <- fishnet %>% mutate(dist_to_hotspot = 0)
+  cat("⚠ No significant hot spots found\n")
+}
+```
+
+**Why distance to hot spots matters:** 
+
+Being close to a cluster of abandoned vehicles may be a stronger predictor than distance to a single vehicle. Hot spots represent areas of concentrated disorder that may influence nearby areas.
+
+---
+
+# Part 5: Join Police Districts
+
+```{r join-districts}
+# Join districts for cross-validation
+fishnet <- st_join(
+  fishnet,
+  policeDistricts,
+  join = st_within,
+  left = TRUE
+) %>%
+  filter(!is.na(District))
+
+cat("✓ Joined police districts\n")
+cat("  - Districts:", length(unique(fishnet$District)), "\n")
+```
+
+---
+
+# Part 6: Count Regression Models
+
+## Prepare Data
+
+```{r prepare-modeling-data}
+# Create clean dataset
+fishnet_model <- fishnet %>%
+  st_drop_geometry() %>%
+  dplyr::select(
+    uniqueID,
+    District,
+    countViolations,
+    abandoned_cars,
+    abandoned_cars.nn,
+    dist_to_hotspot
+  ) %>%
+  na.omit()
+
+cat("✓ Prepared modeling data\n")
+cat("  - Observations:", nrow(fishnet_model), "\n")
+```
+
+## Poisson Regression
+
+```{r fit-poisson}
+# Fit Poisson model
+model_poisson <- glm(
+  countViolations ~ abandoned_cars + abandoned_cars.nn + dist_to_hotspot,
+  data = fishnet_model,
+  family = "poisson"
+)
+
+summary(model_poisson)
+```
+
+**Interpreting coefficients:** 
+
+All three predictor variables are statistically significant, though with different levels of importance:
+
+**abandoned_cars** (β = 0.0014, p = 0.026*): The positive coefficient indicates that cells with more abandoned vehicle calls tend to have higher sanitation violation counts. Each additional abandoned car in a cell is associated with a small increase in expected violations. However, this effect is modest compared to the spatial features.
+
+**abandoned_cars.nn** (β = -0.0045, p < 0.001***): Highly significant and negative. This means cells that are farther from abandoned vehicles (higher mean distance to 3 nearest neighbors) have fewer violations. In other words, being surrounded by abandoned cars strongly predicts more sanitation problems—the spatial context matters more than the count in the cell itself.
+
+**dist_to_hotspot** (β = -0.000016, p < 0.001***): Also highly significant and negative. Cells closer to identified hot spots (lower distance) experience more violations. This captures the spillover effect: being near a cluster of disorder increases violation risk, even if the cell itself had moderate abandoned car counts.
+
+The pattern is clear: spatial proximity to disorder (whether individual abandoned cars or clusters) is a stronger predictor than raw counts alone.
+
+## Check for Overdispersion
+
+```{r check-overdispersion}
+# Calculate dispersion
+dispersion <- sum(residuals(model_poisson, type = "pearson")^2) / 
+              model_poisson$df.residual
+
+cat("Dispersion parameter:", round(dispersion, 2), "\n")
+
+if (dispersion > 1.5) {
+  cat("⚠ Overdispersion detected! Negative Binomial is more appropriate.\n")
+} else {
+  cat("✓ Dispersion acceptable for Poisson.\n")
+}
+```
+
+**What is overdispersion?** 
+
+Poisson regression assumes the mean equals the variance. Real-world count data often has variance greater than the mean (overdispersion). A dispersion parameter > 1.5 suggests we should use Negative Binomial regression instead.
+
+## Negative Binomial Regression
+
+```{r fit-negbin}
+# Fit Negative Binomial
+model_nb <- glm.nb(
+  countViolations ~ abandoned_cars + abandoned_cars.nn + dist_to_hotspot,
+  data = fishnet_model
+)
+
+summary(model_nb)
+
+# Compare models
+cat("\nModel Comparison:\n")
+cat("Poisson AIC:", round(AIC(model_poisson), 1), "\n")
+cat("Negative Binomial AIC:", round(AIC(model_nb), 1), "\n")
+```
+
+**Which model is better?** 
+
+The Negative Binomial model is clearly superior. With an AIC of 10,326 compared to Poisson's 18,376, the NB model improves fit by over 8,000 points—a massive difference. This confirms what the dispersion test showed (φ = 12.39): the data is severely overdispersed, meaning the variance far exceeds the mean.
+
+The Poisson model's assumption that mean equals variance is badly violated here, leading to underestimated standard errors and unreliable inference. The Negative Binomial model adds a dispersion parameter to accommodate this extra variability, providing more realistic predictions and properly calibrated uncertainty estimates. For the remainder of our analysis, we'll use the NB model exclusively.
+
+---
+
+# Part 7: Spatial Cross-Validation
+
+Standard cross-validation randomly splits data, but with spatial data this means training on cells right next to test cells (spatial leakage!). Leave-One-Group-Out (LOGO) cross-validation trains on all districts except one, testing on the held-out district.
+
+```{r spatial-cv}
+# LOGO CV
+districts <- unique(fishnet_model$District)
+cv_results <- tibble()
+
+cat("Running spatial cross-validation...\n")
+
+for (i in seq_along(districts)) {
+  test_district <- districts[i]
+  
+  # Split data
+  train_data <- fishnet_model %>% filter(District != test_district)
+  test_data <- fishnet_model %>% filter(District == test_district)
+  
+  # Fit model
+  model_cv <- glm.nb(
+    countViolations ~ abandoned_cars + abandoned_cars.nn + dist_to_hotspot,
+    data = train_data
+  )
+  
+  # Predict
+  test_data <- test_data %>%
+    mutate(prediction = predict(model_cv, test_data, type = "response"))
+  
+  # Metrics
+  mae <- mean(abs(test_data$countViolations - test_data$prediction))
+  rmse <- sqrt(mean((test_data$countViolations - test_data$prediction)^2))
+  
+  cv_results <- bind_rows(
+    cv_results,
+    tibble(
+      fold = i,
+      test_district = test_district,
+      n_test = nrow(test_data),
+      mae = mae,
+      rmse = rmse
+    )
+  )
+  
+  cat("  Fold", i, "- District", test_district, "- MAE:", round(mae, 2), "\n")
+}
+
+# Overall metrics
+cat("\n✓ Cross-Validation Complete\n")
+cat("Mean MAE:", round(mean(cv_results$mae), 2), "\n")
+cat("Mean RMSE:", round(mean(cv_results$rmse), 2), "\n")
+```
+
+```{r cv-table}
+cv_results %>%
+  arrange(desc(mae)) %>%
+  kable(
+    digits = 2,
+    caption = "Spatial Cross-Validation Results by District",
+    col.names = c("Fold", "District", "N Test", "MAE", "RMSE")
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+**Why spatial CV matters:** 
+
+Spatial cross-validation tests whether the model can generalize to entirely new areas, not just interpolate nearby cells. The results reveal substantial variation in predictability across districts:
+
+**Hardest to predict** (highest MAE):
+- District 19: MAE = 11.08
+- District 18: MAE = 10.39  
+- District 14: MAE = 10.37
+
+**Easiest to predict** (lowest MAE):
+- District 3: MAE = 6.46
+- District 8: MAE = 6.65
+- District 20: MAE = 7.14
+
+Why the variation? Districts 19, 18, and 14 likely have unique characteristics not well-represented in the training data from other districts. These could be neighborhoods with unusual housing stock, different enforcement patterns, or demographic compositions that don't match the city-wide model. The high MAE suggests our predictors (abandoned cars) may not capture the full story in these areas—other factors like vacant lots, commercial corridors, or different reporting behaviors might be at play. This variation reminds us that no single model works equally well everywhere in a diverse city.
+
+---
+
+# Part 8: Model Evaluation
+
+## Generate Final Predictions
+
+```{r final-predictions}
+# Fit final model on all data
+final_model <- glm.nb(
+  countViolations ~ abandoned_cars + abandoned_cars.nn + dist_to_hotspot,
+  data = fishnet_model
+)
+
+# Add predictions to fishnet
+fishnet <- fishnet %>%
+  mutate(
+    prediction_nb = predict(final_model, fishnet_model, type = "response")[match(uniqueID, fishnet_model$uniqueID)]
+  )
+
+# Normalize KDE to same scale
+kde_sum <- sum(fishnet$kde_value, na.rm = TRUE)
+count_sum <- sum(fishnet$countViolations, na.rm = TRUE)
+fishnet <- fishnet %>%
+  mutate(prediction_kde = (kde_value / kde_sum) * count_sum)
+```
+
+## Compare Model vs. Baseline
+
+```{r compare-models}
+#| fig-width: 12
+#| fig-height: 4
+
+p1 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = countViolations), color = NA) +
+  scale_fill_viridis_c(name = "Count", option = "plasma", limits = c(0, 15)) +
+  labs(title = "Actual Violations") +
+  theme_map()
+
+p2 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = prediction_nb), color = NA) +
+  scale_fill_viridis_c(name = "Predicted", option = "plasma", limits = c(0, 15)) +
+  labs(title = "Model Predictions") +
+  theme_map()
+
+p3 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = prediction_kde), color = NA) +
+  scale_fill_viridis_c(name = "Predicted", option = "plasma", limits = c(0, 15)) +
+  labs(title = "KDE Baseline") +
+  theme_map()
+
+p1 + p2 + p3 +
+  plot_annotation(
+    title = "Model Performance Comparison"
+  )
+```
+
+```{r performance-metrics}
+# Calculate metrics
+comparison <- fishnet %>%
+  st_drop_geometry() %>%
+  filter(!is.na(prediction_nb), !is.na(prediction_kde)) %>%
+  summarize(
+    model_mae = mean(abs(countViolations - prediction_nb)),
+    model_rmse = sqrt(mean((countViolations - prediction_nb)^2)),
+    kde_mae = mean(abs(countViolations - prediction_kde)),
+    kde_rmse = sqrt(mean((countViolations - prediction_kde)^2))
+  )
+
+comparison %>%
+  pivot_longer(everything(), names_to = "metric", values_to = "value") %>%
+  separate(metric, into = c("approach", "metric"), sep = "_") %>%
+  pivot_wider(names_from = metric, values_from = value) %>%
+  kable(
+    digits = 2,
+    caption = "Model vs. KDE Baseline Performance",
+    col.names = c("Approach", "MAE", "RMSE")
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+**Does the model outperform the baseline?** 
+
+Surprisingly, the KDE baseline outperforms our Negative Binomial model on both metrics. The KDE achieves an MAE of 5.19 and RMSE of 9.12, compared to the model's MAE of 6.30 and RMSE of 10.57. This means the simple spatial smoothing approach makes predictions that are, on average, about 1 violation closer to the actual counts.
+
+This result is humbling but instructive. It suggests that for sanitation violations in 2017, **spatial autocorrelation (past locations predict future locations) is more powerful than our chosen predictors** (abandoned cars and their spatial distribution). The KDE effectively captures the "violations happen where they happened before" pattern without needing additional variables.
+
+However, this doesn't mean our model is useless. The regression approach offers interpretability—we can explain *why* violations occur (proximity to disorder) rather than just *where*. Additionally, the model could potentially generalize better to new contexts or time periods where the spatial pattern shifts, whereas KDE can only replicate historical patterns. For operational deployment, the simpler KDE might be preferred, but for policy insights, the model remains valuable.
+
+## Error Analysis
+
+```{r error-maps}
+#| fig-width: 10
+#| fig-height: 5
+
+# Calculate errors
+fishnet <- fishnet %>%
+  mutate(
+    error_nb = countViolations - prediction_nb,
+    abs_error_nb = abs(error_nb)
+  )
+
+p1 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = error_nb), color = NA) +
+  scale_fill_gradient2(
+    name = "Error",
+    low = "#2166ac", mid = "white", high = "#b2182b",
+    midpoint = 0
+  ) +
+  labs(title = "Prediction Errors",
+       subtitle = "Red = underpredicted, Blue = overpredicted") +
+  theme_map()
+
+p2 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = abs_error_nb), color = NA) +
+  scale_fill_viridis_c(name = "Abs Error", option = "magma") +
+  labs(title = "Absolute Errors",
+       subtitle = "Where are predictions least accurate?") +
+  theme_map()
+
+p1 + p2
+```
+
+**Spatial patterns in errors:** 
+
+The error maps reveal systematic spatial patterns rather than random noise. The model tends to **underpredict** (red areas) in certain South and West Side neighborhoods where actual violations are higher than expected. Conversely, it **overpredicts** (blue areas) in some areas with moderate abandoned car counts but lower-than-expected violations.
+
+The absolute error map shows the biggest mistakes cluster in specific zones, suggesting we're missing important predictors. Possible explanations:
+
+**What the model is missing:**
+- **Housing tenure**: Owner-occupied vs. renter-occupied properties may have different violation rates regardless of abandoned car prevalence
+- **Property age and condition**: Older housing stock may generate more complaints independent of visible disorder
+- **Population density**: Dense areas might have more eyes on the street reporting issues
+- **Institutional presence**: Areas near schools, parks, or commercial districts may have different patterns
+- **Enforcement capacity**: Some districts may have more aggressive inspection protocols
+
+The spatial clustering of errors suggests these omitted variables themselves have geographic patterns. A more complete model would incorporate demographic, land use, and institutional data beyond our disorder proxy.
+
+---
+
+# Part 9: Model Summary
+
+```{r model-summary-table}
+# Create coefficient table
+model_summary <- broom::tidy(final_model, exponentiate = TRUE) %>%
+  mutate(across(where(is.numeric), ~round(., 3)))
+
+model_summary %>%
+  kable(
+    caption = "Final Model Coefficients (Rate Ratios)",
+    col.names = c("Variable", "Rate Ratio", "Std. Error", "Z", "P-Value")
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  footnote(general = "Rate ratios > 1 indicate positive association with violation counts")
+```
+
+---
+
+# Conclusion
+
+## Key Findings
+
+**Model Performance:**
+- Cross-validation MAE: 7.02
+- Model outperformed KDE baseline: **NO** - KDE achieved lower error (MAE 5.19 vs. 6.30)
+- Most predictive variable: **abandoned_cars.nn** (distance to nearest neighbors) - highly significant with strongest coefficient
+**Spatial Patterns:**
+- Violations are **highly clustered**, concentrated on South and West Sides
+- Hot spots located in neighborhoods with older housing stock and higher disorder indicators
+- Prediction errors show **systematic** patterns - model struggles in districts with unique characteristics (19, 18, 14)
+**Model Limitations:**
+
+Several important limitations constrain our conclusions:
+
+**Missing variables**: We rely solely on abandoned vehicle calls as a disorder proxy. Critical omitted variables include property ownership patterns, housing age, population density, land use mix, and institutional presence (schools, parks, commercial areas). These factors likely explain why some districts were harder to predict.
+
+**Temporal assumptions**: Our 2017 cross-sectional analysis assumes spatial patterns are stable. Neighborhood change, policy shifts, or enforcement priorities could alter relationships over time.
+
+**Measurement issues**: 311 calls reflect both actual conditions *and* reporting behavior. Affluent neighborhoods may report more aggressively, while underserved areas may have normalized disorder. We're modeling reported violations, not necessarily actual sanitation problems.
+
+**Spatial autocorrelation**: The fact that simple KDE outperformed our model suggests violations are primarily driven by spatial inertia ("it happens where it happened before") rather than our chosen predictors. This limits the model's explanatory power.
+
+**Generalizability**: The model is trained on Chicago's specific context. Relationships between abandoned cars and sanitation violations may not transfer to other cities with different housing markets, demographics, or enforcement regimes.
+
+**Improvement paths**: Future work should incorporate census demographics, land use data, property characteristics, and temporal validation to test whether patterns persist across years.
+
+## Practical Implications
+
+**Operational recommendations:**
+
+**Resource allocation**: Given that KDE outperformed the regression model, the city could deploy a hybrid approach - use simple KDE for day-to-day inspection prioritization (where violations happened recently), but use the regression model to understand *why* certain areas are prone to violations (proximity to disorder clusters). This combines operational efficiency with strategic insight.
+
+**Inspection priorities**: The model identifies high-risk cells through the distance-to-hotspot variable. Inspectors could focus on areas within 1-2km of identified disorder clusters, even if those specific cells haven't shown many violations yet. This proactive approach targets spillover zones.
+
+**Targeted interventions**: The strong relationship between abandoned cars and sanitation violations suggests addressing vehicle abandonment could have co-benefits. Programs to expedite vehicle removal, especially in and around hot spots, might reduce multiple forms of neighborhood disorder simultaneously.
+
+**Critical limitations to remember:**
+
+- **Reporting bias**: The model predicts *reported* violations. Under-reporting in some communities means model predictions might misallocate resources away from areas with real but unreported problems.
+
+- **Feedback loops**: Deploying prediction-based enforcement creates self-fulfilling prophecies - more inspections generate more recorded violations, reinforcing the prediction. The city must guard against over-policing already-disadvantaged areas.
+
+- **Equity considerations**: Districts 19, 18, and 14 had the highest prediction errors, suggesting the model works less well in these areas. Resource allocation based on model predictions could systematically disadvantage neighborhoods whose conditions don't match city-wide patterns. Any deployment must include equity audits.
+
+**Ethical principles**: Predictive models should inform, not determine, resource allocation. Human judgment, community input, and equity metrics must remain central to decision-making. The goal is to improve public health outcomes equitably, not to optimize enforcement efficiency at the cost of fairness.
+
+---
+
+## Appendix: Session Info
+
+```{r session-info}
+sessionInfo()
+```
