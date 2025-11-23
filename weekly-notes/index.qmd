@@ -1,0 +1,38 @@
+---
+title: "Weekly Notes"
+---
+
+## Learning Journey
+
+Welcome to my weekly learning reflections for MUSA 5080: Public Policy Analytics. Each week, I document key concepts, coding techniques, challenges, and connections to real-world policy applications.
+
+---
+
+### Available Notes
+
+#### Week 1 - Course Introduction
+**Date:** September 2025  
+**Topics:** RStudio setup, Quarto basics, reproducible workflows  
+**[Read Week 1 Notes →](week-01-notes.html)**
+
+---
+
+### Coming Soon
+
+More weekly reflections will be added as the course progresses. Check back regularly for updates!
+
+---
+
+## About These Notes
+
+Each weekly note includes:
+
+- **Key Concepts Learned** - Main ideas and theories
+- **Coding Techniques** - R/Quarto skills practiced
+- **Questions & Challenges** - Areas needing more exploration
+- **Connections to Policy** - Real-world applications
+- **Reflection** - Personal insights and takeaways
+
+---
+
+[← Back to Portfolio Home](../index.html)

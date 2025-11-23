@@ -3,13 +3,19 @@ project:
   output-dir: docs
 
 website:
-  title: "Zhe Fang – MUSA 5080 Portfolio"
+  title: "Zhe Fang - MUSA 5080 Portfolio"
   navbar:
     left:
       - text: "Home"
         href: index.qmd
+      
       - text: "Weekly Notes"
-        href: weekly-notes/
+        menu:
+          - text: "All Notes"
+            href: weekly-notes/index.html
+          - text: "Week 1 - Course Intro"
+            href: weekly-notes/week-01-notes.qmd
+      
       - text: "Assignments"
         menu:
           - text: "Assignment 1"
@@ -18,6 +24,7 @@ website:
             href: assignments/assignment2/Fang_Zhe_Assignment2.qmd
           - text: "Assignment 4"
             href: assignments/assignment4/Fang_Zhe_Assignment4.qmd
+
 format:
   html:
     theme: cosmo
