@@ -6,9 +6,8 @@ date: today
 format:
   html:
     code-fold: true
-    code-tools:
-      source: true
-      toggle: false
+    code-tools: true
+    toc: true
     toc-depth: 3
     toc-location: right
     theme: cosmo
@@ -36,7 +35,6 @@ I selected this 311 service request type because sanitation issues often indicat
 ```{r setup}
 #| message: false
 #| warning: false
-#| include: false
 
 # Load required packages
 library(tidyverse)      # Data manipulation

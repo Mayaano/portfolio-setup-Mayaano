@@ -1,0 +1,17 @@
+{
+  "hash": "c7dae0ac28e2c437459a1bede3504f64",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"Code Fold Test\"\nformat:\n  html:\n    code-fold: true\n    code-tools: true\n---\n\n## Test 1\n\n\n::: {.cell}\n\n```{.r .cell-code}\nprint(\"This should be folded by default\")\n```\n\n::: {.cell-output .cell-output-stdout}\n\n```\n[1] \"This should be folded by default\"\n```\n\n\n:::\n\n```{.r .cell-code}\nx <- 1:10\nsummary(x)\n```\n\n::: {.cell-output .cell-output-stdout}\n\n```\n   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. \n   1.00    3.25    5.50    5.50    7.75   10.00 \n```\n\n\n:::\n:::\n\n\n## Test 2\n\n\n::: {.cell}\n\n```{.r .cell-code}\nlibrary(ggplot2)\nggplot(mtcars, aes(x = mpg, y = hp)) + \n  geom_point()\n```\n\n::: {.cell-output-display}\n![](test_codefold_files/figure-html/unnamed-chunk-2-1.png){width=672}\n:::\n:::\n\n\nIf \"Hide All Code\" and \"Show All Code\" buttons work here, \nthen the issue is specific to your Assignment 4 file.\n",
+    "supporting": [
+      "test_codefold_files"
+    ],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}

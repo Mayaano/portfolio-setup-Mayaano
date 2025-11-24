@@ -1,0 +1,31 @@
+---
+title: "Week 2 Notes - Algorithms & Census Data"
+date: "2025-09-15"
+---
+
+## Key Concepts Learned
+- Understanding **algorithmic decision-making** in government: how algorithms are used for resource allocation, risk assessment, and service delivery  
+- Difference between **Census (decennial)** vs. **American Community Survey (ACS)**: Census = everyone every 10 years; ACS = sample surveys with yearly estimates  
+- **Margin of Error (MOE)** is critical: smaller geographic units (like block groups) have larger MOEs and less reliable data  
+- **Differential Privacy** in 2020 Census: a new approach to protect individual privacy while releasing data (still controversial among researchers)  
+- Census geography hierarchy: State → County → Tract → Block Group → Block (understanding which level to use matters!)  
+
+## Coding Techniques
+- Introduced to **`tidycensus`** package: pulls Census/ACS data directly into R without manual downloads, keeping workflow reproducible  
+- Learned **`get_acs()`** function: specify `geography` (state/county/tract) and `variables` (e.g., median income) to get estimates + MOE in tidy format  
+- Practiced calculating **MOE percentage** to assess reliability: `(MOE / estimate) * 100` — useful for filtering out unreliable estimates before analysis  
+- Used **`case_when()`** for conditional categorization: cleaner than nested `ifelse()` for creating income brackets or other multi-level groups  
+
+## Questions & Challenges
+- When choosing between **Census vs. ACS**: for historical comparison (e.g., 2010 vs 2020), must use Census; but for recent data, ACS is only option. How to handle this trade-off in longitudinal studies?  
+- **High MOE values** in small areas (like block groups): should I aggregate up to tract level, or keep granular data with strong caveats? What's the standard practice?  
+- Curious about **differential privacy noise injection**: does it systematically bias certain types of analyses (e.g., rural vs urban, small vs large populations)?  
+
+## Connections to Policy
+- Algorithmic bias examples (criminal justice risk scores, Dutch welfare fraud detection) show why **transparency and equity auditing** are non-negotiable in policy analytics  
+- Census data isn't just numbers—it determines **billions in federal funding** and shapes political representation. Getting the data *right* has real consequences  
+- Understanding MOE helps communicate **uncertainty** to policymakers, which builds trust and prevents over-confident decisions  
+
+## Reflection
+- Most interesting: Seeing real-world cases where algorithms went wrong (e.g., welfare fraud system flagged innocent people). Reinforced that **technical skills alone aren't enough**—we need critical thinking about fairness and impact  
+- Plan to apply: Before diving into any spatial analysis, always check the **MOE** and think about whether the geographic level is appropriate for the question I'm asking  

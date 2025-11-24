@@ -1,0 +1,26 @@
+---
+title: "Code Fold Test"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+---
+
+## Test 1
+
+```{r}
+print("This should be folded by default")
+x <- 1:10
+summary(x)
+```
+
+## Test 2
+
+```{r}
+library(ggplot2)
+ggplot(mtcars, aes(x = mpg, y = hp)) + 
+  geom_point()
+```
+
+If "Hide All Code" and "Show All Code" buttons work here, 
+then the issue is specific to your Assignment 4 file.
