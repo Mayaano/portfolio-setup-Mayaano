@@ -19,7 +19,7 @@ website:
       - text: "Assignments"
         menu:
           - text: "Assignment 1"
-            href: assignments/assignment1/Assignment1.qmd
+            href: assignments/assignment1/assignment1.qmd
           - text: "Assignment 2"
             href: assignments/assignment2/Fang_Zhe_Assignment2.qmd
           - text: "Assignment 4"
