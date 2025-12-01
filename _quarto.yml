@@ -19,13 +19,13 @@ website:
       - text: "Assignments"
         menu:
           - text: "Assignment 1"
-            href: assignments/assignment1/assignment1.qmd
+            href: assignments/assignment1/assignment1.html
           - text: "Assignment 2"
-            href: assignments/assignment2/Fang_Zhe_Assignment2.qmd
+            href: assignments/assignment2/Fang_Zhe_Assignment2.html
           - text: "Assignment 4"
-            href: assignments/assignment4/Fang_Zhe_Assignment4.qmd
+            href: assignments/assignment4/Fang_Zhe_Assignment4.html
           - text: "Assignment 5"
-            href: assignments/assignment5/HW5.qmd
+            href: assignments/assignment5/HW5.html
 
 format:
   html:
