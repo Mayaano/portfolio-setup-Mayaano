@@ -24,6 +24,8 @@ website:
             href: assignments/assignment2/Fang_Zhe_Assignment2.qmd
           - text: "Assignment 4"
             href: assignments/assignment4/Fang_Zhe_Assignment4.qmd
+          - text: "Assignment 5"
+            href: assignments/assignment5/HW5.qmd
 
 format:
   html:
