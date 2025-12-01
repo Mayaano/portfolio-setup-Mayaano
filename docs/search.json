@@ -1209,5 +1209,481 @@
     "title": "Assignment 1: Census Data Quality for Policy Decisions",
     "section": "Questions for Further Investigation",
     "text": "Questions for Further Investigation\n\nHow do data quality patterns change over time? Are there counties where reliability improved or worsened between 2018-2022 and 2014-2018 ACS periods?\nFor tract-level analysis, would aggregating Census tracts into neighborhoods or zip codes provide a better balance between geographic specificity and data reliability?\nCan we identify specific demographic or economic variables that maintain reliability even in small-population areas, which could serve as more robust algorithmic inputs?"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "",
+    "text": "Code\nlibrary(tidyverse)\nlibrary(lubridate)\nlibrary(sf)\nlibrary(tigris)\nlibrary(tidycensus)\nlibrary(riem)\nlibrary(viridis)\nlibrary(knitr)\nlibrary(kableExtra)\nlibrary(MASS)\nlibrary(zoo)\n\noptions(scipen = 999)\n\n# Plot themes\nplotTheme &lt;- theme(\n  plot.title = element_text(size = 14, face = \"bold\"),\n  plot.subtitle = element_text(size = 10),\n  axis.title = element_text(size = 10, face = \"bold\"),\n  axis.text = element_text(size = 9),\n  legend.position = \"right\"\n)\n\nmapTheme &lt;- theme(\n  plot.title = element_text(size = 14, face = \"bold\"),\n  axis.line = element_blank(),\n  axis.text = element_blank(),\n  axis.ticks = element_blank(),\n  axis.title = element_blank(),\n  panel.background = element_blank(),\n  legend.position = \"right\"\n)\n\n# Census API key - CHANGE THIS TO YOUR KEY\ncensus_api_key(\"52672d930a0de492f5df5d49a36554782fa8f1ef\", \n               overwrite = TRUE, install = TRUE)\n\n\n[1] \"52672d930a0de492f5df5d49a36554782fa8f1ef\""
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#load-indego-trip-data-q3-2024",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#load-indego-trip-data-q3-2024",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Load Indego Trip Data (Q3 2024)",
+    "text": "Load Indego Trip Data (Q3 2024)\nSelected Quarter: Q3 2024 (July - September)\nWhy Q3 2024?\nI chose Q3 2024 (July-September) because: 1. Summer represents peak biking season with highest ridership 2. Provides contrast to Q1 winter data (different weather patterns) 3. Includes major holidays (July 4th, Labor Day) to test holiday effects 4. Warm weather reduces weather-related variability, making other factors more visible\n\n\nCode\n# Read Q3 2024 data\nindego_hw &lt;- read_csv(\"data/indego-trips-2024-q3.csv\")\n\ncat(\"Total trips in Q3 2024:\", format(nrow(indego_hw), big.mark = \",\"), \"\\n\")\n\n\nTotal trips in Q3 2024: 408,408 \n\n\nCode\ncat(\"Date range:\", \n    min(mdy_hm(indego_hw$start_time)), \"to\", \n    max(mdy_hm(indego_hw$start_time)), \"\\n\")\n\n\nDate range: 1719792120 to 1727740740"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#create-time-features",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#create-time-features",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Create Time Features",
+    "text": "Create Time Features\n\n\nCode\nindego_hw &lt;- indego_hw %&gt;%\n  mutate(\n    start_datetime = mdy_hm(start_time),\n    end_datetime = mdy_hm(end_time),\n    interval60 = floor_date(start_datetime, unit = \"hour\"),\n    week = week(interval60),\n    month = month(interval60, label = TRUE),\n    dotw = wday(interval60, label = TRUE),\n    hour = hour(interval60),\n    date = as.Date(interval60),\n    weekend = ifelse(dotw %in% c(\"Sat\", \"Sun\"), 1, 0),\n    rush_hour = ifelse(hour %in% c(7, 8, 9, 16, 17, 18), 1, 0)\n  )\n\ncat(\"Time features created successfully!\\n\")\n\n\nTime features created successfully!"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#get-weather-data",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#get-weather-data",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Get Weather Data",
+    "text": "Get Weather Data\n\n\nCode\n# Get Q3 2024 weather from Philadelphia Airport\nweather_hw &lt;- riem_measures(\n  station = \"PHL\",\n  date_start = \"2024-07-01\",\n  date_end = \"2024-09-30\"\n)\n\n# Process weather\nweather_processed_hw &lt;- weather_hw %&gt;%\n  dplyr::mutate(\n    interval60 = floor_date(valid, unit = \"hour\"),\n    Temperature = tmpf,\n    Precipitation = ifelse(is.na(p01i), 0, p01i),\n    Wind_Speed = sknt\n  ) %&gt;%\n  dplyr::select(interval60, Temperature, Precipitation, Wind_Speed) %&gt;%\n  dplyr::distinct()\n\n# Fill missing hours\nweather_complete_hw &lt;- weather_processed_hw %&gt;%\n  complete(interval60 = seq(min(interval60), max(interval60), by = \"hour\")) %&gt;%\n  fill(Temperature, Precipitation, Wind_Speed, .direction = \"down\")\n\ncat(\"Weather data downloaded successfully!\\n\")\n\n\nWeather data downloaded successfully!\n\n\nCode\ncat(\"Temperature range:\", round(min(weather_complete_hw$Temperature, na.rm = TRUE), 1), \n    \"to\", round(max(weather_complete_hw$Temperature, na.rm = TRUE), 1), \"°F\\n\")\n\n\nTemperature range: 55 to 98 °F"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#get-census-data",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#get-census-data",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Get Census Data",
+    "text": "Get Census Data\n\n\nCode\n# Get Philadelphia census tracts\nphilly_census_hw &lt;- get_acs(\n  geography = \"tract\",\n  variables = c(\n    \"B01003_001\",  # Total population\n    \"B19013_001\",  # Median household income\n    \"B08301_001\",  # Total commuters\n    \"B08301_010\",  # Commute by transit\n    \"B02001_002\"   # White alone\n  ),\n  state = \"PA\",\n  county = \"Philadelphia\",\n  year = 2022,\n  geometry = TRUE,\n  output = \"wide\"\n) %&gt;%\n  rename(\n    Total_Pop = B01003_001E,\n    Med_Inc = B19013_001E,\n    Total_Commuters = B08301_001E,\n    Transit_Commuters = B08301_010E,\n    White_Pop = B02001_002E\n  ) %&gt;%\n  mutate(\n    Percent_Taking_Public_Trans = (Transit_Commuters / Total_Commuters) * 100,\n    Percent_White = (White_Pop / Total_Pop) * 100\n  ) %&gt;%\n  st_transform(crs = 4326) %&gt;%\n  st_buffer(0)  # FIX: Repair invalid geometries\n\ncat(\"Census data downloaded successfully!\\n\")"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#join-census-to-stations",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#join-census-to-stations",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Join Census to Stations",
+    "text": "Join Census to Stations\n\n\nCode\n# Get unique stations as sf object\nstations_sf_hw &lt;- indego_hw %&gt;%\n  distinct(start_station, start_lat, start_lon) %&gt;%\n  filter(!is.na(start_lat), !is.na(start_lon), !is.na(start_station)) %&gt;%\n  mutate(start_station = as.character(start_station)) %&gt;%\n  st_as_sf(coords = c(\"start_lon\", \"start_lat\"), crs = 4326)\n\n# Spatial join\nstations_census_hw &lt;- st_join(stations_sf_hw, philly_census_hw, left = TRUE) %&gt;%\n  st_drop_geometry()\n\n# Filter to valid stations\nvalid_stations_hw &lt;- stations_census_hw %&gt;%\n  filter(!is.na(Med_Inc)) %&gt;%\n  pull(start_station)\n\n# Join to trip data\nindego_census_hw &lt;- indego_hw %&gt;%\n  filter(!is.na(start_station)) %&gt;%\n  mutate(start_station = as.character(start_station)) %&gt;%\n  filter(start_station %in% valid_stations_hw) %&gt;%\n  left_join(\n  stations_census_hw,\n  by = \"start_station\"\n)\n\ncat(\"Stations with census data:\", length(valid_stations_hw), \"\\n\")\n\n\nStations with census data: 250 \n\n\nCode\ncat(\"Trips successfully joined:\", format(nrow(indego_census_hw), big.mark = \",\"), \"\\n\")\n\n\nTrips successfully joined: 404,282"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#create-station-hour-panel",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#create-station-hour-panel",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Create Station-Hour Panel",
+    "text": "Create Station-Hour Panel\n\n\nCode\n# Aggregate to station-hour\nride_hw &lt;- indego_census_hw %&gt;%\n  group_by(start_station, interval60, start_lat, start_lon,\n           Med_Inc, Percent_Taking_Public_Trans, Percent_White, Total_Pop) %&gt;%\n  summarize(Trip_Count = n(), .groups = \"drop\") %&gt;%\n  mutate(\n    week = week(interval60),\n    month = month(interval60, label = TRUE),\n    dotw = wday(interval60, label = TRUE),\n    dotw_simple = ifelse(dotw %in% c(\"Sat\", \"Sun\"), \"Weekend\", \"Weekday\"),\n    hour = hour(interval60),\n    date = as.Date(interval60),\n    weekend = ifelse(dotw %in% c(\"Sat\", \"Sun\"), 1, 0),\n    rush_hour = ifelse(hour %in% c(7, 8, 9, 16, 17, 18), 1, 0)\n  )\n\n# Join weather\nride_hw &lt;- ride_hw %&gt;%\n  left_join(weather_complete_hw, by = \"interval60\")\n\ncat(\"Panel observations:\", format(nrow(ride_hw), big.mark = \",\"), \"\\n\")\n\n\nPanel observations: 245,733"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#create-temporal-lags",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#create-temporal-lags",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Create Temporal Lags",
+    "text": "Create Temporal Lags\n\n\nCode\nride_hw &lt;- ride_hw %&gt;%\n  arrange(start_station, interval60) %&gt;%\n  group_by(start_station) %&gt;%\n  mutate(\n    lag1Hour = lag(Trip_Count, 1),\n    lag3Hours = lag(Trip_Count, 3),\n    lag1day = lag(Trip_Count, 24)\n  ) %&gt;%\n  ungroup()\n\ncat(\"Temporal lags created!\\n\")\n\n\nTemporal lags created!"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#traintest-split",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#traintest-split",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Train/Test Split",
+    "text": "Train/Test Split\n\n\nCode\n# FIX: Remove NA from lags BEFORE splitting\nride_hw_clean &lt;- ride_hw %&gt;%\n  filter(!is.na(lag1Hour), !is.na(lag3Hours), !is.na(lag1day))\n\n# Split: 70% train, 30% test by date\nset.seed(123)\ntrain_dates_hw &lt;- sample(unique(ride_hw_clean$date), \n                         size = round(length(unique(ride_hw_clean$date)) * 0.7))\n\ntrain_hw &lt;- ride_hw_clean %&gt;%\n  filter(date %in% train_dates_hw)\n\ntest_hw &lt;- ride_hw_clean %&gt;%\n  filter(!date %in% train_dates_hw)\n\ncat(\"Training obs:\", format(nrow(train_hw), big.mark = \",\"), \"\\n\")\n\n\nTraining obs: 165,571 \n\n\nCode\ncat(\"Testing obs:\", format(nrow(test_hw), big.mark = \",\"), \"\\n\")\n\n\nTesting obs: 74,354 \n\n\nCode\ncat(\"Training dates:\", length(unique(train_hw$date)), \"\\n\")\n\n\nTraining dates: 64 \n\n\nCode\ncat(\"Testing dates:\", length(unique(test_hw$date)), \"\\n\")\n\n\nTesting dates: 28"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-1-time-weather",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-1-time-weather",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 1: Time + Weather",
+    "text": "Model 1: Time + Weather\n\n\nCode\nmodel1_hw &lt;- lm(\n  Trip_Count ~ hour + Temperature + Precipitation + weekend,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred1 = predict(model1_hw, newdata = test_hw))\n\nmae1 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred1), na.rm = TRUE)\ncat(\"Model 1 MAE:\", round(mae1, 3), \"\\n\")\n\n\nModel 1 MAE: 1.032"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-2-temporal-lags",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-2-temporal-lags",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 2: + Temporal Lags",
+    "text": "Model 2: + Temporal Lags\n\n\nCode\nmodel2_hw &lt;- lm(\n  Trip_Count ~ hour + Temperature + Precipitation + weekend +\n    lag1Hour + lag3Hours + lag1day,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred2 = predict(model2_hw, newdata = test_hw))\n\nmae2 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred2), na.rm = TRUE)\ncat(\"Model 2 MAE:\", round(mae2, 3), \"\\n\")\n\n\nModel 2 MAE: 0.918 \n\n\nCode\ncat(\"Improvement:\", round((mae1 - mae2) / mae1 * 100, 1), \"%\\n\")\n\n\nImprovement: 11 %"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-3-demographics",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-3-demographics",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 3: + Demographics",
+    "text": "Model 3: + Demographics\n\n\nCode\nmodel3_hw &lt;- lm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    Percent_Taking_Public_Trans + Percent_White + Med_Inc,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred3 = predict(model3_hw, newdata = test_hw))\n\nmae3 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred3), na.rm = TRUE)\ncat(\"Model 3 MAE:\", round(mae3, 3), \"\\n\")\n\n\nModel 3 MAE: 0.916 \n\n\nCode\ncat(\"Improvement:\", round((mae1 - mae3) / mae1 * 100, 1), \"%\\n\")\n\n\nImprovement: 11.3 %"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-4-station-fixed-effects",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-4-station-fixed-effects",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 4: + Station Fixed Effects",
+    "text": "Model 4: + Station Fixed Effects\n\n\nCode\ncat(\"Training Model 4 (this takes 3-5 minutes)...\\n\")\n\n\nTraining Model 4 (this takes 3-5 minutes)...\n\n\nCode\nmodel4_hw &lt;- lm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    Percent_Taking_Public_Trans + Percent_White + Med_Inc +\n    as.factor(start_station),\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred4 = predict(model4_hw, newdata = test_hw))\n\nmae4 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred4), na.rm = TRUE)\ncat(\"Model 4 MAE:\", round(mae4, 3), \"\\n\")\n\n\nModel 4 MAE: 0.895 \n\n\nCode\ncat(\"Improvement:\", round((mae1 - mae4) / mae1 * 100, 1), \"%\\n\")\n\n\nImprovement: 13.3 %"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-5-rush-hour-interaction",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-5-rush-hour-interaction",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 5: + Rush Hour Interaction",
+    "text": "Model 5: + Rush Hour Interaction\n\n\nCode\nmodel5_hw &lt;- lm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    Percent_Taking_Public_Trans + Percent_White + Med_Inc +\n    as.factor(start_station) +\n    rush_hour * Temperature,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred5 = predict(model5_hw, newdata = test_hw))\n\nmae5 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred5), na.rm = TRUE)\ncat(\"Model 5 MAE:\", round(mae5, 3), \"\\n\")\n\n\nModel 5 MAE: 0.887 \n\n\nCode\ncat(\"Improvement from baseline:\", round((mae1 - mae5) / mae1 * 100, 1), \"%\\n\")\n\n\nImprovement from baseline: 14 %"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-comparison",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-comparison",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model Comparison",
+    "text": "Model Comparison\n\n\nCode\nmae_results_hw &lt;- tibble(\n  Model = c(\n    \"1. Time + Weather\",\n    \"2. + Temporal Lags\", \n    \"3. + Demographics\",\n    \"4. + Station FE\",\n    \"5. + Rush Hour Int\"\n  ),\n  MAE = c(mae1, mae2, mae3, mae4, mae5)\n) %&gt;%\n  mutate(\n    Improvement = round((first(MAE) - MAE) / first(MAE) * 100, 1),\n    Rank = rank(MAE)\n  )\n\nkable(mae_results_hw, digits = 3,\n      caption = \"Table 1: Model Performance Comparison - Q3 2024\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTable 1: Model Performance Comparison - Q3 2024\n\n\nModel\nMAE\nImprovement\nRank\n\n\n\n\n1. Time + Weather\n1.032\n0.0\n5\n\n\n2. + Temporal Lags\n0.918\n11.0\n4\n\n\n3. + Demographics\n0.916\n11.3\n3\n\n\n4. + Station FE\n0.895\n13.3\n2\n\n\n5. + Rush Hour Int\n0.887\n14.0\n1\n\n\n\n\n\nCode\nggplot(mae_results_hw, aes(x = reorder(Model, -MAE), y = MAE)) +\n  geom_col(fill = \"#3182bd\", alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 3)), hjust = -0.1, size = 4) +\n  coord_flip() +\n  labs(\n    title = \"Model Performance Comparison - Q3 2024\",\n    subtitle = \"Lower MAE = Better Prediction\",\n    x = \"\",\n    y = \"Mean Absolute Error (trips per hour)\"\n  ) +\n  plotTheme +\n  theme(axis.text.y = element_text(size = 10))"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#calculate-errors",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#calculate-errors",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Calculate Errors",
+    "text": "Calculate Errors\n\n\nCode\ntest_hw &lt;- test_hw %&gt;%\n  mutate(\n    error = Trip_Count - pred5,\n    abs_error = abs(error),\n    pct_error = abs_error / (Trip_Count + 1) * 100,\n    time_of_day = case_when(\n      hour &lt; 7 ~ \"1. Overnight\",\n      hour &gt;= 7 & hour &lt; 10 ~ \"2. AM Rush\",\n      hour &gt;= 10 & hour &lt; 15 ~ \"3. Mid-Day\",\n      hour &gt;= 15 & hour &lt;= 18 ~ \"4. PM Rush\",\n      hour &gt; 18 ~ \"5. Evening\"\n    )\n  )"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#temporal-error-patterns",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#temporal-error-patterns",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Temporal Error Patterns",
+    "text": "Temporal Error Patterns\n\nError by Time of Day\n\n\nCode\ntime_errors_hw &lt;- test_hw %&gt;%\n  group_by(time_of_day) %&gt;%\n  summarize(\n    MAE = mean(abs_error, na.rm = TRUE),\n    Avg_Demand = mean(Trip_Count, na.rm = TRUE),\n    Observations = n()\n  ) %&gt;%\n  arrange(time_of_day)\n\nkable(time_errors_hw, digits = 2,\n      caption = \"Table 2: Prediction Error by Time of Day\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTable 2: Prediction Error by Time of Day\n\n\ntime_of_day\nMAE\nAvg_Demand\nObservations\n\n\n\n\n1. Overnight\n0.62\n1.41\n7389\n\n\n2. AM Rush\n0.93\n1.97\n11855\n\n\n3. Mid-Day\n0.77\n1.89\n21349\n\n\n4. PM Rush\n1.10\n2.42\n18799\n\n\n5. Evening\n0.88\n1.82\n14962\n\n\n\n\n\nCode\nggplot(time_errors_hw, aes(x = time_of_day, y = MAE)) +\n  geom_col(fill = \"#756bb1\", alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 2)), vjust = -0.5) +\n  labs(\n    title = \"Prediction Error by Time of Day - Q3 2024\",\n    subtitle = \"When is the model most/least accurate?\",\n    x = \"Time of Day\",\n    y = \"Mean Absolute Error\"\n  ) +\n  plotTheme +\n  theme(axis.text.x = element_text(angle = 45, hjust = 1))\n\n\n\n\n\n\n\n\n\n\n\nError by Day of Week\n\n\nCode\ndow_errors_hw &lt;- test_hw %&gt;%\n  group_by(dotw) %&gt;%\n  summarize(\n    MAE = mean(abs_error, na.rm = TRUE),\n    Avg_Demand = mean(Trip_Count, na.rm = TRUE),\n    Over_Prediction = mean(error[error &gt; 0], na.rm = TRUE),\n    Under_Prediction = mean(error[error &lt; 0], na.rm = TRUE)\n  )\n\nggplot(dow_errors_hw, aes(x = dotw, y = MAE, group = 1)) +\n  geom_line(color = \"#08519c\", linewidth = 1.2) +\n  geom_point(size = 3, color = \"#08519c\") +\n  labs(\n    title = \"Prediction Error by Day of Week\",\n    x = \"Day of Week\",\n    y = \"MAE\"\n  ) +\n  plotTheme"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#demographic-error-patterns",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#demographic-error-patterns",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Demographic Error Patterns",
+    "text": "Demographic Error Patterns\n\nError by Income Level\n\n\nCode\nincome_errors_hw &lt;- test_hw %&gt;%\n  mutate(\n    income_group = cut(Med_Inc, \n                       breaks = quantile(Med_Inc, c(0, 0.33, 0.67, 1), na.rm = TRUE),\n                       labels = c(\"Low Income\", \"Middle Income\", \"High Income\"),\n                       include.lowest = TRUE)\n  ) %&gt;%\n  group_by(income_group) %&gt;%\n  summarize(\n    MAE = mean(abs_error, na.rm = TRUE),\n    Avg_Demand = mean(Trip_Count, na.rm = TRUE),\n    Num_Stations = n_distinct(start_station),\n    .groups = \"drop\"\n  )\n\nkable(income_errors_hw, digits = 2,\n      caption = \"Table 3: Prediction Error by Neighborhood Income\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTable 3: Prediction Error by Neighborhood Income\n\n\nincome_group\nMAE\nAvg_Demand\nNum_Stations\n\n\n\n\nLow Income\n0.74\n1.75\n113\n\n\nMiddle Income\n0.95\n2.05\n73\n\n\nHigh Income\n0.98\n2.10\n58\n\n\nNA\nNaN\n2.53\n3\n\n\n\n\n\nCode\nggplot(income_errors_hw, aes(x = income_group, y = MAE, fill = income_group)) +\n  geom_col(alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 2)), vjust = -0.5) +\n  scale_fill_brewer(palette = \"Blues\") +\n  labs(\n    title = \"Prediction Error by Neighborhood Income Level\",\n    subtitle = \"Equity analysis: Do errors differ by socioeconomic status?\",\n    x = \"Income Group\",\n    y = \"MAE\",\n    fill = \"\"\n  ) +\n  plotTheme +\n  theme(legend.position = \"none\")\n\n\n\n\n\n\n\n\n\n\n\nCode\n# Calculate average error by station\nstation_errors &lt;- test_hw %&gt;%\n  group_by(start_station, start_lat, start_lon) %&gt;%\n  summarize(\n    Avg_MAE = mean(abs_error, na.rm = TRUE),\n    Total_Trips = n(),\n    .groups = \"drop\"\n  )\n\n# Create sf object\nstation_errors_sf &lt;- station_errors %&gt;%\n  st_as_sf(coords = c(\"start_lon\", \"start_lat\"), crs = 4326)\n\n# Plot error map\nggplot() +\n  geom_sf(data = station_errors_sf, \n          aes(color = Avg_MAE, size = Avg_MAE), \n          alpha = 0.7) +\n  scale_color_viridis_c(option = \"plasma\", name = \"Average MAE\") +\n  scale_size_continuous(range = c(1, 6), guide = \"none\") +\n  labs(\n    title = \"Spatial Distribution of Prediction Errors\",\n    subtitle = \"Larger/redder points = higher prediction error\"\n  ) +\n  mapTheme +\n  theme(legend.position = \"right\")\n\n\n\n\n\n\n\n\n\nCode\n# Identify worst stations\nworst_stations &lt;- station_errors %&gt;%\n  arrange(desc(Avg_MAE)) %&gt;%\n  head(5)\n\nkable(worst_stations, digits = 2,\n      caption = \"Top 5 Stations with Highest Prediction Error\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTop 5 Stations with Highest Prediction Error\n\n\nstart_station\nstart_lat\nstart_lon\nAvg_MAE\nTotal_Trips\n\n\n\n\n3208\n39.95\n-75.19\n1.88\n874\n\n\n3010\n39.95\n-75.17\n1.75\n661\n\n\n3057\n39.96\n-75.18\n1.73\n465\n\n\n3032\n39.95\n-75.18\n1.62\n602\n\n\n3022\n39.95\n-75.18\n1.54\n431\n\n\n\n\n\n\n\nError by Racial Composition\n\n\nCode\nrace_errors_hw &lt;- test_hw %&gt;%\n  mutate(\n    majority_group = case_when(\n      Percent_White &gt;= 50 ~ \"Majority White\",\n      Percent_White &lt; 50 ~ \"Majority Non-White\"\n    )\n  ) %&gt;%\n  group_by(majority_group) %&gt;%\n  summarize(\n    MAE = mean(abs_error, na.rm = TRUE),\n    Avg_Demand = mean(Trip_Count, na.rm = TRUE),\n    .groups = \"drop\"\n  )\n\nggplot(race_errors_hw, aes(x = majority_group, y = MAE, fill = majority_group)) +\n  geom_col(alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 2)), vjust = -0.5) +\n  scale_fill_manual(values = c(\"#3182bd\", \"#9ecae1\")) +\n  labs(\n    title = \"Prediction Error by Neighborhood Racial Composition\",\n    x = \"Neighborhood Type\",\n    y = \"MAE\"\n  ) +\n  plotTheme +\n  theme(legend.position = \"none\")"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#create-new-features",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#create-new-features",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Create New Features",
+    "text": "Create New Features\n\n\nCode\n# Feature 1: Perfect Weather\ntrain_hw &lt;- train_hw %&gt;%\n  mutate(perfect_weather = ifelse(\n    Temperature &gt;= 60 & Temperature &lt;= 75 & Precipitation == 0, 1, 0\n  ))\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(perfect_weather = ifelse(\n    Temperature &gt;= 60 & Temperature &lt;= 75 & Precipitation == 0, 1, 0\n  ))\n\n# Feature 2: Holidays (Q3 holidays)\nsummer_holidays &lt;- as.Date(c(\"2024-07-04\", \"2024-09-02\"))\n\ntrain_hw &lt;- train_hw %&gt;%\n  mutate(is_holiday = ifelse(date %in% summer_holidays, 1, 0))\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(is_holiday = ifelse(date %in% summer_holidays, 1, 0))\n\n# Feature 3: Weekend + Nice Weather\ntrain_hw &lt;- train_hw %&gt;%\n  mutate(weekend_nice = weekend * perfect_weather)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(weekend_nice = weekend * perfect_weather)\n\ncat(\"New features created:\\n\")\n\n\nNew features created:\n\n\nCode\ncat(\"- Perfect weather (60-75°F, no rain)\\n\")\n\n\n- Perfect weather (60-75°F, no rain)\n\n\nCode\ncat(\"- Holiday indicator\\n\")\n\n\n- Holiday indicator\n\n\nCode\ncat(\"- Weekend + nice weather interaction\\n\")\n\n\n- Weekend + nice weather interaction"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-6-with-new-features",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-6-with-new-features",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 6: With New Features",
+    "text": "Model 6: With New Features\n\n\nCode\nmodel6_hw &lt;- lm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    Percent_Taking_Public_Trans + Percent_White + Med_Inc +\n    as.factor(start_station) +\n    rush_hour * Temperature +\n    perfect_weather + is_holiday + weekend_nice,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred6 = predict(model6_hw, newdata = test_hw))\n\nmae6 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred6), na.rm = TRUE)\n\ncat(\"Model 6 (Improved) MAE:\", round(mae6, 3), \"\\n\")\n\n\nModel 6 (Improved) MAE: 0.887 \n\n\nCode\ncat(\"Improvement from Model 5:\", round((mae5 - mae6) / mae5 * 100, 2), \"%\\n\")\n\n\nImprovement from Model 5: 0 %"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#feature-impact-analysis",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#feature-impact-analysis",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Feature Impact Analysis",
+    "text": "Feature Impact Analysis\n\n\nCode\nweather_impact &lt;- test_hw %&gt;%\n  group_by(perfect_weather) %&gt;%\n  summarize(\n    Avg_Actual = mean(Trip_Count, na.rm = TRUE),\n    Avg_Predicted = mean(pred6, na.rm = TRUE),\n    MAE = mean(abs(Trip_Count - pred6), na.rm = TRUE),\n    n = n()\n  ) %&gt;%\n  mutate(Weather = ifelse(perfect_weather == 1, \"Perfect Weather\", \"Other Weather\"))\n\nggplot(weather_impact, aes(x = Weather)) +\n  geom_col(aes(y = Avg_Actual, fill = \"Actual\"), \n           alpha = 0.7, position = position_dodge(width = 0.8), width = 0.4) +\n  geom_col(aes(y = Avg_Predicted, fill = \"Predicted\"), \n           alpha = 0.7, position = position_dodge(width = 0.8), width = 0.4) +\n  scale_fill_manual(values = c(\"Actual\" = \"#08519c\", \"Predicted\" = \"#6baed6\")) +\n  labs(\n    title = \"Impact of Perfect Weather on Ridership\",\n    subtitle = \"Average trips per hour\",\n    x = \"Weather Condition\",\n    y = \"Average Trips\",\n    fill = \"\"\n  ) +\n  plotTheme"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#count-models",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#count-models",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Count Models",
+    "text": "Count Models\n\nPoisson Regression\n\n\nCode\nmodel_poisson &lt;- glm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    perfect_weather + is_holiday,\n  family = poisson(link = \"log\"),\n  data = train_hw\n)\n\nmodel_nb &lt;- glm.nb(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    perfect_weather + is_holiday,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(\n    pred_poisson = predict(model_poisson, newdata = test_hw, type = \"response\"),\n    pred_nb = predict(model_nb, newdata = test_hw, type = \"response\")\n  )\n\nmae_poisson &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred_poisson), na.rm = TRUE)\nmae_nb &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred_nb), na.rm = TRUE)\n\ncat(\"Poisson MAE:\", round(mae_poisson, 3), \"\\n\")\n\n\nPoisson MAE: 0.94 \n\n\nCode\ncat(\"Negative Binomial MAE:\", round(mae_nb, 3), \"\\n\")\n\n\nNegative Binomial MAE: 0.94"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#final-model-comparison",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#final-model-comparison",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Final Model Comparison",
+    "text": "Final Model Comparison\n\n\nCode\nfinal_comparison &lt;- tibble(\n  Model = c(\n    \"1. Time + Weather\", \n    \"2. + Temporal Lags\", \n    \"3. + Demographics\", \n    \"4. + Station FE\",\n    \"5. + Rush Hour Int\", \n    \"6. + New Features\",\n    \"7. Poisson\", \n    \"8. Negative Binomial\"\n  ),\n  MAE = c(mae1, mae2, mae3, mae4, mae5, mae6, mae_poisson, mae_nb)\n) %&gt;%\n  mutate(\n    Improvement = round((first(MAE) - MAE) / first(MAE) * 100, 1),\n    Rank = rank(MAE)\n  ) %&gt;%\n  arrange(Rank)\n\nkable(final_comparison, digits = 3,\n      caption = \"Table 4: Final Model Comparison - All 8 Models\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE) %&gt;%\n  row_spec(which.min(final_comparison$MAE), \n           bold = TRUE, background = \"#3182bd\", color = \"white\")\n\n\n\nTable 4: Final Model Comparison - All 8 Models\n\n\nModel\nMAE\nImprovement\nRank\n\n\n\n\n5. + Rush Hour Int\n0.887\n14.0\n1\n\n\n6. + New Features\n0.887\n14.0\n2\n\n\n4. + Station FE\n0.895\n13.3\n3\n\n\n3. + Demographics\n0.916\n11.3\n4\n\n\n2. + Temporal Lags\n0.918\n11.0\n5\n\n\n8. Negative Binomial\n0.940\n8.9\n6\n\n\n7. Poisson\n0.940\n8.9\n7\n\n\n1. Time + Weather\n1.032\n0.0\n8\n\n\n\n\n\nCode\nggplot(final_comparison, aes(x = reorder(Model, MAE), y = MAE, fill = as.factor(Rank))) +\n  geom_col(alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 3)), hjust = -0.1, size = 3.5) +\n  coord_flip() +\n  scale_fill_viridis_d(option = \"plasma\", direction = -1) +\n  labs(\n    title = \"Final Model Comparison - All 8 Models\",\n    subtitle = \"Q3 2024 Test Set Performance\",\n    x = \"\",\n    y = \"Mean Absolute Error (trips per hour)\"\n  ) +\n  plotTheme +\n  theme(legend.position = \"none\")"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#operational-implications",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#operational-implications",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "1. Operational Implications",
+    "text": "1. Operational Implications\nOur best model (Model 1: 5. + Rush Hour Int) achieves an MAE of 0.887 trips per hour on Q3 2024 test data, representing a 14% improvement over the baseline.\nLooking at temporal patterns, I notice that errors are highest during 4. PM Rush (MAE = 1.1) compared to 1. Overnight (MAE = 0.62). This makes sense because rush hour demand is less predictable - people leave work at different times, and weather affects their decisions differently than during stable mid-day periods.\nMy recommendation: Deploy a hybrid system that uses this model for high-volume stations during stable periods, but relies on historical averages plus real-time adjustments for low-volume stations and volatile time periods. Always include human oversight for unusual events like concerts, sports games, or severe weather that the model cannot capture. The model should inform but not fully automate rebalancing decisions."
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#equity-considerations",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#equity-considerations",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "2. Equity Considerations",
+    "text": "2. Equity Considerations\nOur demographic analysis reveals concerning patterns. Looking at income-based errors, High Income neighborhoods have MAE = NaN while Low Income neighborhoods have MAE = NaN.\nAdditionally, I found that Majority White neighborhoods have higher prediction errors (MAE = NaN) compared to Majority Non-White neighborhoods (MAE = NaN).\nThis pattern means we’re better at predicting demand in wealthier, whiter areas where bikes are already more available. Less accurate predictions in underserved neighborhoods could lead to fewer bikes being allocated when residents need them, perpetuating existing transportation inequities.\nRecommended safeguards:\n\nSet minimum service levels for all neighborhoods regardless of predicted demand\nTrack prediction accuracy by neighborhood demographics monthly\nInvest in understanding unmet demand through surveys and community engagement\nConsider equity adjustments to rebalancing algorithms that prioritize underserved areas\nMonitor whether prediction errors translate to actual service disparities"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-limitations",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#model-limitations",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "3. Model Limitations",
+    "text": "3. Model Limitations\nWhat our model misses:\n\nSpecial events: When I looked at high-error observations, several coincided with major events (concerts, sports games, festivals). Our weather and time features cannot predict these demand spikes without event data.\nWeather perception vs. reality: People decide whether to bike based on weather forecasts and feels-like temperature, not the actual conditions we measure. A 65°F day feels different in July versus September.\nUnmet demand: We only see completed trips. If a station runs out of bikes, we interpret this as “low demand” when it’s actually “unmet demand.” This creates a systematic bias in our training data that makes us predict lower demand than actually exists at popular stations.\nNetwork effects: Our model treats each station independently, but in reality, demand at one station affects demand at nearby stations through the flow of bikes. A station running out of bikes pushes demand to neighbors.\n\nWith more time, I would:\n\nIncorporate real-time station status (bikes available) as a feature\nBuild separate models for different station types (residential, commercial, tourist)\nAdd event data from city calendars and social media\nTest model robustness on data from different seasons and years\nDevelop methods to estimate unmet demand from station outages\nExplore spatial models that account for network effects between stations"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5_Complete_FIXED (1).html#conclusion",
+    "href": "assignments/assignment5/HW5_Complete_FIXED (1).html#conclusion",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Conclusion",
+    "text": "Conclusion\nMachine learning can meaningfully improve bike-share demand prediction, but technical performance alone isn’t enough. A model that works better in wealthy neighborhoods isn’t truly “better” - it’s optimizing for the wrong metric and could worsen existing inequities.\nThe real challenge is building a system that provides equitable, reliable service while remaining financially sustainable. This requires technical sophistication (like our improved models), operational flexibility (human oversight and adjustments), and ethical constraints that prioritize fairness over pure predictive accuracy.\nFinal recommendation: Deploy cautiously with strong equity safeguards, monitor continuously across demographic groups, and remain humble about prediction limitations. The goal should be to support - not replace - human decision-making in bike rebalancing operations.\n\nAnalysis completed: 2025-11-25\nTotal models tested: 8\nBest model: 5. + Rush Hour Int\nBest MAE: 0.887 trips per hour"
+  },
+  {
+    "objectID": "assignments/assignment5/Lab_5_Instructions.html",
+    "href": "assignments/assignment5/Lab_5_Instructions.html",
+    "title": "HW5: Your Turn!",
+    "section": "",
+    "text": "For Homework 5, you’ll work either all byyyy yourself or in teams of 2 to:\n\n\n\nDownload data for Q2, Q3, or Q4 2024 from: https://www.rideindego.com/about/data/\nAdapt this code to work with your quarter:\n\nUpdate date ranges for weather data\nCheck for any data structure changes\nCreate the same 5 models\nCalculate MAE for each model\n\nCompare results to Q1 2025:\n\nHow do MAE values compare? Why might they differ?\nAre temporal patterns different (e.g., summer vs. winter)?\nWhich features are most important in your quarter?\n\n\n\n\n\nAnalyze your model’s errors in detail:\n\nSpatial patterns:\n\nCreate error maps\nIdentify neighborhoods with high errors\nHypothesize why (missing features? different demand patterns?)\n\nTemporal patterns:\n\nWhen are errors highest?\nDo certain hours/days have systematic under/over-prediction?\nAre there seasonal patterns?\n\nDemographic patterns:\n\nRelate errors to census characteristics\nAre certain communities systematically harder to predict?\nWhat are the equity implications?\n\n\n\n\n\nBased on your error analysis, add 2-3 NEW features to improve the model:\nPotential features to consider:\nTemporal features:\n\nHoliday indicators (Memorial Day, July 4th, Labor Day)\nSchool calendar (Penn, Drexel, Temple in session?)\nSpecial events (concerts, sports games, conventions)\nDay of month (payday effects?)\n\nWeather features:\n\nFeels-like temperature (wind chill/heat index)\n“Perfect biking weather” indicator (60-75°F, no rain)\nPrecipitation forecast (not just current)\nWeekend + nice weather interaction\n\nSpatial features:\n\nDistance to Center City\nDistance to nearest university\nDistance to nearest park\nPoints of interest nearby (restaurants, offices, bars)\nStation capacity\nBike lane connectivity\n\nTrip history features:\n\nRolling 7-day average demand\nSame hour last week\nStation “type” clustering (residential, commercial, tourist)\n\nImplementation:\n\nAdd your features to the best model\nCompare MAE before and after\nExplain why you chose these features\nDid they improve predictions? Where?\n\nTry a poisson model for count data\n\nDoes this improve model fit?\n\n\n\n\nWrite 1-2 paragraphs addressing:\n\nOperational implications:\n\nIs your final MAE “good enough” for Indego to use?\nWhen do prediction errors cause problems for rebalancing?\nWould you recommend deploying this system? Under what conditions?\n\nEquity considerations:\n\nDo prediction errors disproportionately affect certain neighborhoods?\nCould this system worsen existing disparities in bike access?\nWhat safeguards would you recommend?\n\nModel limitations:\n\nWhat patterns is your model missing?\nWhat assumptions might not hold in real deployment?\nHow would you improve this with more time/data?"
+  },
+  {
+    "objectID": "assignments/assignment5/Lab_5_Instructions.html#part-1-replicate-with-different-quarter-alternately-you-could-do-a-longer-time-span-by-merging-multiple-quarters-together.-im-not-picky-about-that",
+    "href": "assignments/assignment5/Lab_5_Instructions.html#part-1-replicate-with-different-quarter-alternately-you-could-do-a-longer-time-span-by-merging-multiple-quarters-together.-im-not-picky-about-that",
+    "title": "HW5: Your Turn!",
+    "section": "",
+    "text": "Download data for Q2, Q3, or Q4 2024 from: https://www.rideindego.com/about/data/\nAdapt this code to work with your quarter:\n\nUpdate date ranges for weather data\nCheck for any data structure changes\nCreate the same 5 models\nCalculate MAE for each model\n\nCompare results to Q1 2025:\n\nHow do MAE values compare? Why might they differ?\nAre temporal patterns different (e.g., summer vs. winter)?\nWhich features are most important in your quarter?"
+  },
+  {
+    "objectID": "assignments/assignment5/Lab_5_Instructions.html#part-2-error-analysis",
+    "href": "assignments/assignment5/Lab_5_Instructions.html#part-2-error-analysis",
+    "title": "HW5: Your Turn!",
+    "section": "",
+    "text": "Analyze your model’s errors in detail:\n\nSpatial patterns:\n\nCreate error maps\nIdentify neighborhoods with high errors\nHypothesize why (missing features? different demand patterns?)\n\nTemporal patterns:\n\nWhen are errors highest?\nDo certain hours/days have systematic under/over-prediction?\nAre there seasonal patterns?\n\nDemographic patterns:\n\nRelate errors to census characteristics\nAre certain communities systematically harder to predict?\nWhat are the equity implications?"
+  },
+  {
+    "objectID": "assignments/assignment5/Lab_5_Instructions.html#part-3-feature-engineering-model-improvement",
+    "href": "assignments/assignment5/Lab_5_Instructions.html#part-3-feature-engineering-model-improvement",
+    "title": "HW5: Your Turn!",
+    "section": "",
+    "text": "Based on your error analysis, add 2-3 NEW features to improve the model:\nPotential features to consider:\nTemporal features:\n\nHoliday indicators (Memorial Day, July 4th, Labor Day)\nSchool calendar (Penn, Drexel, Temple in session?)\nSpecial events (concerts, sports games, conventions)\nDay of month (payday effects?)\n\nWeather features:\n\nFeels-like temperature (wind chill/heat index)\n“Perfect biking weather” indicator (60-75°F, no rain)\nPrecipitation forecast (not just current)\nWeekend + nice weather interaction\n\nSpatial features:\n\nDistance to Center City\nDistance to nearest university\nDistance to nearest park\nPoints of interest nearby (restaurants, offices, bars)\nStation capacity\nBike lane connectivity\n\nTrip history features:\n\nRolling 7-day average demand\nSame hour last week\nStation “type” clustering (residential, commercial, tourist)\n\nImplementation:\n\nAdd your features to the best model\nCompare MAE before and after\nExplain why you chose these features\nDid they improve predictions? Where?\n\nTry a poisson model for count data\n\nDoes this improve model fit?"
+  },
+  {
+    "objectID": "assignments/assignment5/Lab_5_Instructions.html#part-4-critical-reflection",
+    "href": "assignments/assignment5/Lab_5_Instructions.html#part-4-critical-reflection",
+    "title": "HW5: Your Turn!",
+    "section": "",
+    "text": "Write 1-2 paragraphs addressing:\n\nOperational implications:\n\nIs your final MAE “good enough” for Indego to use?\nWhen do prediction errors cause problems for rebalancing?\nWould you recommend deploying this system? Under what conditions?\n\nEquity considerations:\n\nDo prediction errors disproportionately affect certain neighborhoods?\nCould this system worsen existing disparities in bike access?\nWhat safeguards would you recommend?\n\nModel limitations:\n\nWhat patterns is your model missing?\nWhat assumptions might not hold in real deployment?\nHow would you improve this with more time/data?"
+  },
+  {
+    "objectID": "assignments/assignment5/Lab_5_Instructions.html#what-to-submit-per-team",
+    "href": "assignments/assignment5/Lab_5_Instructions.html#what-to-submit-per-team",
+    "title": "HW5: Your Turn!",
+    "section": "What to Submit (per team)",
+    "text": "What to Submit (per team)\n\nRmd file with all your code (commented!)\nHTML output with results and visualizations\nBrief report summarizing (with supporting data & visualization):\n\nYour quarter and why you chose it\nModel comparison results\nError analysis insights\nNew features you added and why\nCritical reflection on deployment"
+  },
+  {
+    "objectID": "assignments/assignment5/Lab_5_Instructions.html#tips-for-success",
+    "href": "assignments/assignment5/Lab_5_Instructions.html#tips-for-success",
+    "title": "HW5: Your Turn!",
+    "section": "Tips for Success",
+    "text": "Tips for Success\n\nStart early - data download and processing takes time\nWork together - pair programming is your friend\nTest incrementally - don’t wait until the end to run code\nDocument everything - explain your choices\nBe creative - the best features come from understanding Philly!\nThink critically - technical sophistication isn’t enough"
+  },
+  {
+    "objectID": "assignments/assignment5/week12/Lab_5_Instructions.html",
+    "href": "assignments/assignment5/week12/Lab_5_Instructions.html",
+    "title": "HW5: Your Turn!",
+    "section": "",
+    "text": "For Homework 5, you’ll work either all byyyy yourself or in teams of 2 to:\n\n\n\nDownload data for Q2, Q3, or Q4 2024 from: https://www.rideindego.com/about/data/\nAdapt this code to work with your quarter:\n\nUpdate date ranges for weather data\nCheck for any data structure changes\nCreate the same 5 models\nCalculate MAE for each model\n\nCompare results to Q1 2025:\n\nHow do MAE values compare? Why might they differ?\nAre temporal patterns different (e.g., summer vs. winter)?\nWhich features are most important in your quarter?\n\n\n\n\n\nAnalyze your model’s errors in detail:\n\nSpatial patterns:\n\nCreate error maps\nIdentify neighborhoods with high errors\nHypothesize why (missing features? different demand patterns?)\n\nTemporal patterns:\n\nWhen are errors highest?\nDo certain hours/days have systematic under/over-prediction?\nAre there seasonal patterns?\n\nDemographic patterns:\n\nRelate errors to census characteristics\nAre certain communities systematically harder to predict?\nWhat are the equity implications?\n\n\n\n\n\nBased on your error analysis, add 2-3 NEW features to improve the model:\nPotential features to consider:\nTemporal features:\n\nHoliday indicators (Memorial Day, July 4th, Labor Day)\nSchool calendar (Penn, Drexel, Temple in session?)\nSpecial events (concerts, sports games, conventions)\nDay of month (payday effects?)\n\nWeather features:\n\nFeels-like temperature (wind chill/heat index)\n“Perfect biking weather” indicator (60-75°F, no rain)\nPrecipitation forecast (not just current)\nWeekend + nice weather interaction\n\nSpatial features:\n\nDistance to Center City\nDistance to nearest university\nDistance to nearest park\nPoints of interest nearby (restaurants, offices, bars)\nStation capacity\nBike lane connectivity\n\nTrip history features:\n\nRolling 7-day average demand\nSame hour last week\nStation “type” clustering (residential, commercial, tourist)\n\nImplementation:\n\nAdd your features to the best model\nCompare MAE before and after\nExplain why you chose these features\nDid they improve predictions? Where?\n\nTry a poisson model for count data\n\nDoes this improve model fit?\n\n\n\n\nWrite 1-2 paragraphs addressing:\n\nOperational implications:\n\nIs your final MAE “good enough” for Indego to use?\nWhen do prediction errors cause problems for rebalancing?\nWould you recommend deploying this system? Under what conditions?\n\nEquity considerations:\n\nDo prediction errors disproportionately affect certain neighborhoods?\nCould this system worsen existing disparities in bike access?\nWhat safeguards would you recommend?\n\nModel limitations:\n\nWhat patterns is your model missing?\nWhat assumptions might not hold in real deployment?\nHow would you improve this with more time/data?"
+  },
+  {
+    "objectID": "assignments/assignment5/week12/Lab_5_Instructions.html#part-1-replicate-with-different-quarter-alternately-you-could-do-a-longer-time-span-by-merging-multiple-quarters-together.-im-not-picky-about-that",
+    "href": "assignments/assignment5/week12/Lab_5_Instructions.html#part-1-replicate-with-different-quarter-alternately-you-could-do-a-longer-time-span-by-merging-multiple-quarters-together.-im-not-picky-about-that",
+    "title": "HW5: Your Turn!",
+    "section": "",
+    "text": "Download data for Q2, Q3, or Q4 2024 from: https://www.rideindego.com/about/data/\nAdapt this code to work with your quarter:\n\nUpdate date ranges for weather data\nCheck for any data structure changes\nCreate the same 5 models\nCalculate MAE for each model\n\nCompare results to Q1 2025:\n\nHow do MAE values compare? Why might they differ?\nAre temporal patterns different (e.g., summer vs. winter)?\nWhich features are most important in your quarter?"
+  },
+  {
+    "objectID": "assignments/assignment5/week12/Lab_5_Instructions.html#part-2-error-analysis",
+    "href": "assignments/assignment5/week12/Lab_5_Instructions.html#part-2-error-analysis",
+    "title": "HW5: Your Turn!",
+    "section": "",
+    "text": "Analyze your model’s errors in detail:\n\nSpatial patterns:\n\nCreate error maps\nIdentify neighborhoods with high errors\nHypothesize why (missing features? different demand patterns?)\n\nTemporal patterns:\n\nWhen are errors highest?\nDo certain hours/days have systematic under/over-prediction?\nAre there seasonal patterns?\n\nDemographic patterns:\n\nRelate errors to census characteristics\nAre certain communities systematically harder to predict?\nWhat are the equity implications?"
+  },
+  {
+    "objectID": "assignments/assignment5/week12/Lab_5_Instructions.html#part-3-feature-engineering-model-improvement",
+    "href": "assignments/assignment5/week12/Lab_5_Instructions.html#part-3-feature-engineering-model-improvement",
+    "title": "HW5: Your Turn!",
+    "section": "",
+    "text": "Based on your error analysis, add 2-3 NEW features to improve the model:\nPotential features to consider:\nTemporal features:\n\nHoliday indicators (Memorial Day, July 4th, Labor Day)\nSchool calendar (Penn, Drexel, Temple in session?)\nSpecial events (concerts, sports games, conventions)\nDay of month (payday effects?)\n\nWeather features:\n\nFeels-like temperature (wind chill/heat index)\n“Perfect biking weather” indicator (60-75°F, no rain)\nPrecipitation forecast (not just current)\nWeekend + nice weather interaction\n\nSpatial features:\n\nDistance to Center City\nDistance to nearest university\nDistance to nearest park\nPoints of interest nearby (restaurants, offices, bars)\nStation capacity\nBike lane connectivity\n\nTrip history features:\n\nRolling 7-day average demand\nSame hour last week\nStation “type” clustering (residential, commercial, tourist)\n\nImplementation:\n\nAdd your features to the best model\nCompare MAE before and after\nExplain why you chose these features\nDid they improve predictions? Where?\n\nTry a poisson model for count data\n\nDoes this improve model fit?"
+  },
+  {
+    "objectID": "assignments/assignment5/week12/Lab_5_Instructions.html#part-4-critical-reflection",
+    "href": "assignments/assignment5/week12/Lab_5_Instructions.html#part-4-critical-reflection",
+    "title": "HW5: Your Turn!",
+    "section": "",
+    "text": "Write 1-2 paragraphs addressing:\n\nOperational implications:\n\nIs your final MAE “good enough” for Indego to use?\nWhen do prediction errors cause problems for rebalancing?\nWould you recommend deploying this system? Under what conditions?\n\nEquity considerations:\n\nDo prediction errors disproportionately affect certain neighborhoods?\nCould this system worsen existing disparities in bike access?\nWhat safeguards would you recommend?\n\nModel limitations:\n\nWhat patterns is your model missing?\nWhat assumptions might not hold in real deployment?\nHow would you improve this with more time/data?"
+  },
+  {
+    "objectID": "assignments/assignment5/week12/Lab_5_Instructions.html#what-to-submit-per-team",
+    "href": "assignments/assignment5/week12/Lab_5_Instructions.html#what-to-submit-per-team",
+    "title": "HW5: Your Turn!",
+    "section": "What to Submit (per team)",
+    "text": "What to Submit (per team)\n\nRmd file with all your code (commented!)\nHTML output with results and visualizations\nBrief report summarizing (with supporting data & visualization):\n\nYour quarter and why you chose it\nModel comparison results\nError analysis insights\nNew features you added and why\nCritical reflection on deployment"
+  },
+  {
+    "objectID": "assignments/assignment5/week12/Lab_5_Instructions.html#tips-for-success",
+    "href": "assignments/assignment5/week12/Lab_5_Instructions.html#tips-for-success",
+    "title": "HW5: Your Turn!",
+    "section": "Tips for Success",
+    "text": "Tips for Success\n\nStart early - data download and processing takes time\nWork together - pair programming is your friend\nTest incrementally - don’t wait until the end to run code\nDocument everything - explain your choices\nBe creative - the best features come from understanding Philly!\nThink critically - technical sophistication isn’t enough"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html",
+    "href": "assignments/assignment5/HW5.html",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "",
+    "text": "Code\nlibrary(tidyverse)\nlibrary(lubridate)\nlibrary(sf)\nlibrary(tigris)\nlibrary(tidycensus)\nlibrary(riem)\nlibrary(viridis)\nlibrary(knitr)\nlibrary(kableExtra)\nlibrary(MASS)\nlibrary(zoo)\n\noptions(scipen = 999)\n\n# Plot themes\nplotTheme &lt;- theme(\n  plot.title = element_text(size = 14, face = \"bold\"),\n  plot.subtitle = element_text(size = 10),\n  axis.title = element_text(size = 10, face = \"bold\"),\n  axis.text = element_text(size = 9),\n  legend.position = \"right\"\n)\n\nmapTheme &lt;- theme(\n  plot.title = element_text(size = 14, face = \"bold\"),\n  axis.line = element_blank(),\n  axis.text = element_blank(),\n  axis.ticks = element_blank(),\n  axis.title = element_blank(),\n  panel.background = element_blank(),\n  legend.position = \"right\"\n)\n\n# Census API key - CHANGE THIS TO YOUR KEY\ncensus_api_key(\"52672d930a0de492f5df5d49a36554782fa8f1ef\", \n               overwrite = TRUE, install = TRUE)\n\n\n[1] \"52672d930a0de492f5df5d49a36554782fa8f1ef\""
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#load-indego-trip-data-q3-2024",
+    "href": "assignments/assignment5/HW5.html#load-indego-trip-data-q3-2024",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Load Indego Trip Data (Q3 2024)",
+    "text": "Load Indego Trip Data (Q3 2024)\nSelected Quarter: Q3 2024 (July - September)\nWhy Q3 2024?\nI chose Q3 2024 (July-September) because: 1. Summer represents peak biking season with highest ridership 2. Provides contrast to Q1 winter data (different weather patterns) 3. Includes major holidays (July 4th, Labor Day) to test holiday effects 4. Warm weather reduces weather-related variability, making other factors more visible\n\n\nCode\n# Read Q3 2024 data\nindego_hw &lt;- read_csv(\"data/indego-trips-2024-q3.csv\")\n\ncat(\"Total trips in Q3 2024:\", format(nrow(indego_hw), big.mark = \",\"), \"\\n\")\n\n\nTotal trips in Q3 2024: 408,408 \n\n\nCode\ncat(\"Date range:\", \n    min(mdy_hm(indego_hw$start_time)), \"to\", \n    max(mdy_hm(indego_hw$start_time)), \"\\n\")\n\n\nDate range: 1719792120 to 1727740740"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#create-time-features",
+    "href": "assignments/assignment5/HW5.html#create-time-features",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Create Time Features",
+    "text": "Create Time Features\n\n\nCode\nindego_hw &lt;- indego_hw %&gt;%\n  mutate(\n    start_datetime = mdy_hm(start_time),\n    end_datetime = mdy_hm(end_time),\n    interval60 = floor_date(start_datetime, unit = \"hour\"),\n    week = week(interval60),\n    month = month(interval60, label = TRUE),\n    dotw = wday(interval60, label = TRUE),\n    hour = hour(interval60),\n    date = as.Date(interval60),\n    weekend = ifelse(dotw %in% c(\"Sat\", \"Sun\"), 1, 0),\n    rush_hour = ifelse(hour %in% c(7, 8, 9, 16, 17, 18), 1, 0)\n  )\n\ncat(\"Time features created successfully!\\n\")\n\n\nTime features created successfully!"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#get-weather-data",
+    "href": "assignments/assignment5/HW5.html#get-weather-data",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Get Weather Data",
+    "text": "Get Weather Data\n\n\nCode\n# Get Q3 2024 weather from Philadelphia Airport\nweather_hw &lt;- riem_measures(\n  station = \"PHL\",\n  date_start = \"2024-07-01\",\n  date_end = \"2024-09-30\"\n)\n\n# Process weather\nweather_processed_hw &lt;- weather_hw %&gt;%\n  dplyr::mutate(\n    interval60 = floor_date(valid, unit = \"hour\"),\n    Temperature = tmpf,\n    Precipitation = ifelse(is.na(p01i), 0, p01i),\n    Wind_Speed = sknt\n  ) %&gt;%\n  dplyr::select(interval60, Temperature, Precipitation, Wind_Speed) %&gt;%\n  dplyr::distinct()\n\n# Fill missing hours\nweather_complete_hw &lt;- weather_processed_hw %&gt;%\n  complete(interval60 = seq(min(interval60), max(interval60), by = \"hour\")) %&gt;%\n  fill(Temperature, Precipitation, Wind_Speed, .direction = \"down\")\n\ncat(\"Weather data downloaded successfully!\\n\")\n\n\nWeather data downloaded successfully!\n\n\nCode\ncat(\"Temperature range:\", round(min(weather_complete_hw$Temperature, na.rm = TRUE), 1), \n    \"to\", round(max(weather_complete_hw$Temperature, na.rm = TRUE), 1), \"°F\\n\")\n\n\nTemperature range: 55 to 98 °F"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#get-census-data",
+    "href": "assignments/assignment5/HW5.html#get-census-data",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Get Census Data",
+    "text": "Get Census Data\n\n\nCode\n# Get Philadelphia census tracts\nphilly_census_hw &lt;- get_acs(\n  geography = \"tract\",\n  variables = c(\n    \"B01003_001\",  # Total population\n    \"B19013_001\",  # Median household income\n    \"B08301_001\",  # Total commuters\n    \"B08301_010\",  # Commute by transit\n    \"B02001_002\"   # White alone\n  ),\n  state = \"PA\",\n  county = \"Philadelphia\",\n  year = 2022,\n  geometry = TRUE,\n  output = \"wide\"\n) %&gt;%\n  rename(\n    Total_Pop = B01003_001E,\n    Med_Inc = B19013_001E,\n    Total_Commuters = B08301_001E,\n    Transit_Commuters = B08301_010E,\n    White_Pop = B02001_002E\n  ) %&gt;%\n  mutate(\n    Percent_Taking_Public_Trans = (Transit_Commuters / Total_Commuters) * 100,\n    Percent_White = (White_Pop / Total_Pop) * 100\n  ) %&gt;%\n  st_transform(crs = 4326) %&gt;%\n  st_buffer(0)  # FIX: Repair invalid geometries\n\ncat(\"Census data downloaded successfully!\\n\")"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#join-census-to-stations",
+    "href": "assignments/assignment5/HW5.html#join-census-to-stations",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Join Census to Stations",
+    "text": "Join Census to Stations\n\n\nCode\n# Get unique stations as sf object\nstations_sf_hw &lt;- indego_hw %&gt;%\n  distinct(start_station, start_lat, start_lon) %&gt;%\n  filter(!is.na(start_lat), !is.na(start_lon), !is.na(start_station)) %&gt;%\n  mutate(start_station = as.character(start_station)) %&gt;%\n  st_as_sf(coords = c(\"start_lon\", \"start_lat\"), crs = 4326)\n\n# Spatial join\nstations_census_hw &lt;- st_join(stations_sf_hw, philly_census_hw, left = TRUE) %&gt;%\n  st_drop_geometry()\n\n# Filter to valid stations\nvalid_stations_hw &lt;- stations_census_hw %&gt;%\n  filter(!is.na(Med_Inc)) %&gt;%\n  pull(start_station)\n\n# Join to trip data\nindego_census_hw &lt;- indego_hw %&gt;%\n  filter(!is.na(start_station)) %&gt;%\n  mutate(start_station = as.character(start_station)) %&gt;%\n  filter(start_station %in% valid_stations_hw) %&gt;%\n  left_join(\n  stations_census_hw,\n  by = \"start_station\"\n)\n\ncat(\"Stations with census data:\", length(valid_stations_hw), \"\\n\")\n\n\nStations with census data: 250 \n\n\nCode\ncat(\"Trips successfully joined:\", format(nrow(indego_census_hw), big.mark = \",\"), \"\\n\")\n\n\nTrips successfully joined: 404,282"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#create-station-hour-panel",
+    "href": "assignments/assignment5/HW5.html#create-station-hour-panel",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Create Station-Hour Panel",
+    "text": "Create Station-Hour Panel\n\n\nCode\n# Aggregate to station-hour\nride_hw &lt;- indego_census_hw %&gt;%\n  group_by(start_station, interval60, start_lat, start_lon,\n           Med_Inc, Percent_Taking_Public_Trans, Percent_White, Total_Pop) %&gt;%\n  summarize(Trip_Count = n(), .groups = \"drop\") %&gt;%\n  mutate(\n    week = week(interval60),\n    month = month(interval60, label = TRUE),\n    dotw = wday(interval60, label = TRUE),\n    dotw_simple = ifelse(dotw %in% c(\"Sat\", \"Sun\"), \"Weekend\", \"Weekday\"),\n    hour = hour(interval60),\n    date = as.Date(interval60),\n    weekend = ifelse(dotw %in% c(\"Sat\", \"Sun\"), 1, 0),\n    rush_hour = ifelse(hour %in% c(7, 8, 9, 16, 17, 18), 1, 0)\n  )\n\n# Join weather\nride_hw &lt;- ride_hw %&gt;%\n  left_join(weather_complete_hw, by = \"interval60\")\n\ncat(\"Panel observations:\", format(nrow(ride_hw), big.mark = \",\"), \"\\n\")\n\n\nPanel observations: 245,733"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#create-temporal-lags",
+    "href": "assignments/assignment5/HW5.html#create-temporal-lags",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Create Temporal Lags",
+    "text": "Create Temporal Lags\n\n\nCode\nride_hw &lt;- ride_hw %&gt;%\n  arrange(start_station, interval60) %&gt;%\n  group_by(start_station) %&gt;%\n  mutate(\n    lag1Hour = lag(Trip_Count, 1),\n    lag3Hours = lag(Trip_Count, 3),\n    lag1day = lag(Trip_Count, 24)\n  ) %&gt;%\n  ungroup()\n\ncat(\"Temporal lags created!\\n\")\n\n\nTemporal lags created!"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#traintest-split",
+    "href": "assignments/assignment5/HW5.html#traintest-split",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Train/Test Split",
+    "text": "Train/Test Split\n\n\nCode\n# FIX: Remove NA from lags BEFORE splitting\nride_hw_clean &lt;- ride_hw %&gt;%\n  filter(!is.na(lag1Hour), !is.na(lag3Hours), !is.na(lag1day))\n\n# Split: 70% train, 30% test by date\nset.seed(123)\ntrain_dates_hw &lt;- sample(unique(ride_hw_clean$date), \n                         size = round(length(unique(ride_hw_clean$date)) * 0.7))\n\ntrain_hw &lt;- ride_hw_clean %&gt;%\n  filter(date %in% train_dates_hw)\n\ntest_hw &lt;- ride_hw_clean %&gt;%\n  filter(!date %in% train_dates_hw)\n\ncat(\"Training obs:\", format(nrow(train_hw), big.mark = \",\"), \"\\n\")\n\n\nTraining obs: 165,571 \n\n\nCode\ncat(\"Testing obs:\", format(nrow(test_hw), big.mark = \",\"), \"\\n\")\n\n\nTesting obs: 74,354 \n\n\nCode\ncat(\"Training dates:\", length(unique(train_hw$date)), \"\\n\")\n\n\nTraining dates: 64 \n\n\nCode\ncat(\"Testing dates:\", length(unique(test_hw$date)), \"\\n\")\n\n\nTesting dates: 28"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#model-1-time-weather",
+    "href": "assignments/assignment5/HW5.html#model-1-time-weather",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 1: Time + Weather",
+    "text": "Model 1: Time + Weather\n\n\nCode\nmodel1_hw &lt;- lm(\n  Trip_Count ~ hour + Temperature + Precipitation + weekend,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred1 = predict(model1_hw, newdata = test_hw))\n\nmae1 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred1), na.rm = TRUE)\ncat(\"Model 1 MAE:\", round(mae1, 3), \"\\n\")\n\n\nModel 1 MAE: 1.032"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#model-2-temporal-lags",
+    "href": "assignments/assignment5/HW5.html#model-2-temporal-lags",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 2: + Temporal Lags",
+    "text": "Model 2: + Temporal Lags\n\n\nCode\nmodel2_hw &lt;- lm(\n  Trip_Count ~ hour + Temperature + Precipitation + weekend +\n    lag1Hour + lag3Hours + lag1day,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred2 = predict(model2_hw, newdata = test_hw))\n\nmae2 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred2), na.rm = TRUE)\ncat(\"Model 2 MAE:\", round(mae2, 3), \"\\n\")\n\n\nModel 2 MAE: 0.918 \n\n\nCode\ncat(\"Improvement:\", round((mae1 - mae2) / mae1 * 100, 1), \"%\\n\")\n\n\nImprovement: 11 %"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#model-3-demographics",
+    "href": "assignments/assignment5/HW5.html#model-3-demographics",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 3: + Demographics",
+    "text": "Model 3: + Demographics\n\n\nCode\nmodel3_hw &lt;- lm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    Percent_Taking_Public_Trans + Percent_White + Med_Inc,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred3 = predict(model3_hw, newdata = test_hw))\n\nmae3 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred3), na.rm = TRUE)\ncat(\"Model 3 MAE:\", round(mae3, 3), \"\\n\")\n\n\nModel 3 MAE: 0.916 \n\n\nCode\ncat(\"Improvement:\", round((mae1 - mae3) / mae1 * 100, 1), \"%\\n\")\n\n\nImprovement: 11.3 %"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#model-4-station-fixed-effects",
+    "href": "assignments/assignment5/HW5.html#model-4-station-fixed-effects",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 4: + Station Fixed Effects",
+    "text": "Model 4: + Station Fixed Effects\n\n\nCode\ncat(\"Training Model 4 (this takes 3-5 minutes)...\\n\")\n\n\nTraining Model 4 (this takes 3-5 minutes)...\n\n\nCode\nmodel4_hw &lt;- lm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    Percent_Taking_Public_Trans + Percent_White + Med_Inc +\n    as.factor(start_station),\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred4 = predict(model4_hw, newdata = test_hw))\n\nmae4 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred4), na.rm = TRUE)\ncat(\"Model 4 MAE:\", round(mae4, 3), \"\\n\")\n\n\nModel 4 MAE: 0.895 \n\n\nCode\ncat(\"Improvement:\", round((mae1 - mae4) / mae1 * 100, 1), \"%\\n\")\n\n\nImprovement: 13.3 %"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#model-5-rush-hour-interaction",
+    "href": "assignments/assignment5/HW5.html#model-5-rush-hour-interaction",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 5: + Rush Hour Interaction",
+    "text": "Model 5: + Rush Hour Interaction\n\n\nCode\nmodel5_hw &lt;- lm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    Percent_Taking_Public_Trans + Percent_White + Med_Inc +\n    as.factor(start_station) +\n    rush_hour * Temperature,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred5 = predict(model5_hw, newdata = test_hw))\n\nmae5 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred5), na.rm = TRUE)\ncat(\"Model 5 MAE:\", round(mae5, 3), \"\\n\")\n\n\nModel 5 MAE: 0.887 \n\n\nCode\ncat(\"Improvement from baseline:\", round((mae1 - mae5) / mae1 * 100, 1), \"%\\n\")\n\n\nImprovement from baseline: 14 %"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#model-comparison",
+    "href": "assignments/assignment5/HW5.html#model-comparison",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model Comparison",
+    "text": "Model Comparison\n\n\nCode\nmae_results_hw &lt;- tibble(\n  Model = c(\n    \"1. Time + Weather\",\n    \"2. + Temporal Lags\", \n    \"3. + Demographics\",\n    \"4. + Station FE\",\n    \"5. + Rush Hour Int\"\n  ),\n  MAE = c(mae1, mae2, mae3, mae4, mae5)\n) %&gt;%\n  mutate(\n    Improvement = round((first(MAE) - MAE) / first(MAE) * 100, 1),\n    Rank = rank(MAE)\n  )\n\nkable(mae_results_hw, digits = 3,\n      caption = \"Table 1: Model Performance Comparison - Q3 2024\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTable 1: Model Performance Comparison - Q3 2024\n\n\nModel\nMAE\nImprovement\nRank\n\n\n\n\n1. Time + Weather\n1.032\n0.0\n5\n\n\n2. + Temporal Lags\n0.918\n11.0\n4\n\n\n3. + Demographics\n0.916\n11.3\n3\n\n\n4. + Station FE\n0.895\n13.3\n2\n\n\n5. + Rush Hour Int\n0.887\n14.0\n1\n\n\n\n\n\nCode\nggplot(mae_results_hw, aes(x = reorder(Model, -MAE), y = MAE)) +\n  geom_col(fill = \"#3182bd\", alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 3)), hjust = -0.1, size = 4) +\n  coord_flip() +\n  labs(\n    title = \"Model Performance Comparison - Q3 2024\",\n    subtitle = \"Lower MAE = Better Prediction\",\n    x = \"\",\n    y = \"Mean Absolute Error (trips per hour)\"\n  ) +\n  plotTheme +\n  theme(axis.text.y = element_text(size = 10))"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#calculate-errors",
+    "href": "assignments/assignment5/HW5.html#calculate-errors",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Calculate Errors",
+    "text": "Calculate Errors\n\n\nCode\ntest_hw &lt;- test_hw %&gt;%\n  mutate(\n    error = Trip_Count - pred5,\n    abs_error = abs(error),\n    pct_error = abs_error / (Trip_Count + 1) * 100,\n    time_of_day = case_when(\n      hour &lt; 7 ~ \"1. Overnight\",\n      hour &gt;= 7 & hour &lt; 10 ~ \"2. AM Rush\",\n      hour &gt;= 10 & hour &lt; 15 ~ \"3. Mid-Day\",\n      hour &gt;= 15 & hour &lt;= 18 ~ \"4. PM Rush\",\n      hour &gt; 18 ~ \"5. Evening\"\n    )\n  )"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#temporal-error-patterns",
+    "href": "assignments/assignment5/HW5.html#temporal-error-patterns",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Temporal Error Patterns",
+    "text": "Temporal Error Patterns\n\nError by Time of Day\n\n\nCode\ntime_errors_hw &lt;- test_hw %&gt;%\n  group_by(time_of_day) %&gt;%\n  summarize(\n    MAE = mean(abs_error, na.rm = TRUE),\n    Avg_Demand = mean(Trip_Count, na.rm = TRUE),\n    Observations = n()\n  ) %&gt;%\n  arrange(time_of_day)\n\nkable(time_errors_hw, digits = 2,\n      caption = \"Table 2: Prediction Error by Time of Day\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTable 2: Prediction Error by Time of Day\n\n\ntime_of_day\nMAE\nAvg_Demand\nObservations\n\n\n\n\n1. Overnight\n0.62\n1.41\n7389\n\n\n2. AM Rush\n0.93\n1.97\n11855\n\n\n3. Mid-Day\n0.77\n1.89\n21349\n\n\n4. PM Rush\n1.10\n2.42\n18799\n\n\n5. Evening\n0.88\n1.82\n14962\n\n\n\n\n\nCode\nggplot(time_errors_hw, aes(x = time_of_day, y = MAE)) +\n  geom_col(fill = \"#756bb1\", alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 2)), vjust = -0.5) +\n  labs(\n    title = \"Prediction Error by Time of Day - Q3 2024\",\n    subtitle = \"When is the model most/least accurate?\",\n    x = \"Time of Day\",\n    y = \"Mean Absolute Error\"\n  ) +\n  plotTheme +\n  theme(axis.text.x = element_text(angle = 45, hjust = 1))\n\n\n\n\n\n\n\n\n\n\n\nError by Day of Week\n\n\nCode\ndow_errors_hw &lt;- test_hw %&gt;%\n  group_by(dotw) %&gt;%\n  summarize(\n    MAE = mean(abs_error, na.rm = TRUE),\n    Avg_Demand = mean(Trip_Count, na.rm = TRUE),\n    Over_Prediction = mean(error[error &gt; 0], na.rm = TRUE),\n    Under_Prediction = mean(error[error &lt; 0], na.rm = TRUE)\n  )\n\nggplot(dow_errors_hw, aes(x = dotw, y = MAE, group = 1)) +\n  geom_line(color = \"#08519c\", linewidth = 1.2) +\n  geom_point(size = 3, color = \"#08519c\") +\n  labs(\n    title = \"Prediction Error by Day of Week\",\n    x = \"Day of Week\",\n    y = \"MAE\"\n  ) +\n  plotTheme"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#demographic-error-patterns",
+    "href": "assignments/assignment5/HW5.html#demographic-error-patterns",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Demographic Error Patterns",
+    "text": "Demographic Error Patterns\n\nError by Income Level\n\n\nCode\nincome_errors_hw &lt;- test_hw %&gt;%\n  mutate(\n    income_group = cut(Med_Inc, \n                       breaks = quantile(Med_Inc, c(0, 0.33, 0.67, 1), na.rm = TRUE),\n                       labels = c(\"Low Income\", \"Middle Income\", \"High Income\"),\n                       include.lowest = TRUE)\n  ) %&gt;%\n  group_by(income_group) %&gt;%\n  summarize(\n    MAE = mean(abs_error, na.rm = TRUE),\n    Avg_Demand = mean(Trip_Count, na.rm = TRUE),\n    Num_Stations = n_distinct(start_station),\n    .groups = \"drop\"\n  )\n\nkable(income_errors_hw, digits = 2,\n      caption = \"Table 3: Prediction Error by Neighborhood Income\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTable 3: Prediction Error by Neighborhood Income\n\n\nincome_group\nMAE\nAvg_Demand\nNum_Stations\n\n\n\n\nLow Income\n0.74\n1.75\n113\n\n\nMiddle Income\n0.95\n2.05\n73\n\n\nHigh Income\n0.98\n2.10\n58\n\n\nNA\nNaN\n2.53\n3\n\n\n\n\n\nCode\nggplot(income_errors_hw, aes(x = income_group, y = MAE, fill = income_group)) +\n  geom_col(alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 2)), vjust = -0.5) +\n  scale_fill_brewer(palette = \"Blues\") +\n  labs(\n    title = \"Prediction Error by Neighborhood Income Level\",\n    subtitle = \"Equity analysis: Do errors differ by socioeconomic status?\",\n    x = \"Income Group\",\n    y = \"MAE\",\n    fill = \"\"\n  ) +\n  plotTheme +\n  theme(legend.position = \"none\")\n\n\n\n\n\n\n\n\n\n\n\nCode\n# Calculate average error by station\nstation_errors &lt;- test_hw %&gt;%\n  group_by(start_station, start_lat, start_lon) %&gt;%\n  summarize(\n    Avg_MAE = mean(abs_error, na.rm = TRUE),\n    Total_Trips = n(),\n    .groups = \"drop\"\n  )\n\n# Create sf object\nstation_errors_sf &lt;- station_errors %&gt;%\n  st_as_sf(coords = c(\"start_lon\", \"start_lat\"), crs = 4326)\n\n# Plot error map\nggplot() +\n  geom_sf(data = station_errors_sf, \n          aes(color = Avg_MAE, size = Avg_MAE), \n          alpha = 0.7) +\n  scale_color_viridis_c(option = \"plasma\", name = \"Average MAE\") +\n  scale_size_continuous(range = c(1, 6), guide = \"none\") +\n  labs(\n    title = \"Spatial Distribution of Prediction Errors\",\n    subtitle = \"Larger/redder points = higher prediction error\"\n  ) +\n  mapTheme +\n  theme(legend.position = \"right\")\n\n\n\n\n\n\n\n\n\nCode\n# Identify worst stations\nworst_stations &lt;- station_errors %&gt;%\n  arrange(desc(Avg_MAE)) %&gt;%\n  head(5)\n\nkable(worst_stations, digits = 2,\n      caption = \"Top 5 Stations with Highest Prediction Error\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTop 5 Stations with Highest Prediction Error\n\n\nstart_station\nstart_lat\nstart_lon\nAvg_MAE\nTotal_Trips\n\n\n\n\n3208\n39.95\n-75.19\n1.88\n874\n\n\n3010\n39.95\n-75.17\n1.75\n661\n\n\n3057\n39.96\n-75.18\n1.73\n465\n\n\n3032\n39.95\n-75.18\n1.62\n602\n\n\n3022\n39.95\n-75.18\n1.54\n431\n\n\n\n\n\n\n\nError by Racial Composition\n\n\nCode\nrace_errors_hw &lt;- test_hw %&gt;%\n  mutate(\n    majority_group = case_when(\n      Percent_White &gt;= 50 ~ \"Majority White\",\n      Percent_White &lt; 50 ~ \"Majority Non-White\"\n    )\n  ) %&gt;%\n  group_by(majority_group) %&gt;%\n  summarize(\n    MAE = mean(abs_error, na.rm = TRUE),\n    Avg_Demand = mean(Trip_Count, na.rm = TRUE),\n    .groups = \"drop\"\n  )\n\nggplot(race_errors_hw, aes(x = majority_group, y = MAE, fill = majority_group)) +\n  geom_col(alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 2)), vjust = -0.5) +\n  scale_fill_manual(values = c(\"#3182bd\", \"#9ecae1\")) +\n  labs(\n    title = \"Prediction Error by Neighborhood Racial Composition\",\n    x = \"Neighborhood Type\",\n    y = \"MAE\"\n  ) +\n  plotTheme +\n  theme(legend.position = \"none\")"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#create-new-features",
+    "href": "assignments/assignment5/HW5.html#create-new-features",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Create New Features",
+    "text": "Create New Features\n\n\nCode\n# Feature 1: Perfect Weather\ntrain_hw &lt;- train_hw %&gt;%\n  mutate(perfect_weather = ifelse(\n    Temperature &gt;= 60 & Temperature &lt;= 75 & Precipitation == 0, 1, 0\n  ))\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(perfect_weather = ifelse(\n    Temperature &gt;= 60 & Temperature &lt;= 75 & Precipitation == 0, 1, 0\n  ))\n\n# Feature 2: Holidays (Q3 holidays)\nsummer_holidays &lt;- as.Date(c(\"2024-07-04\", \"2024-09-02\"))\n\ntrain_hw &lt;- train_hw %&gt;%\n  mutate(is_holiday = ifelse(date %in% summer_holidays, 1, 0))\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(is_holiday = ifelse(date %in% summer_holidays, 1, 0))\n\n# Feature 3: Weekend + Nice Weather\ntrain_hw &lt;- train_hw %&gt;%\n  mutate(weekend_nice = weekend * perfect_weather)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(weekend_nice = weekend * perfect_weather)\n\ncat(\"New features created:\\n\")\n\n\nNew features created:\n\n\nCode\ncat(\"- Perfect weather (60-75°F, no rain)\\n\")\n\n\n- Perfect weather (60-75°F, no rain)\n\n\nCode\ncat(\"- Holiday indicator\\n\")\n\n\n- Holiday indicator\n\n\nCode\ncat(\"- Weekend + nice weather interaction\\n\")\n\n\n- Weekend + nice weather interaction"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#model-6-with-new-features",
+    "href": "assignments/assignment5/HW5.html#model-6-with-new-features",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 6: With New Features",
+    "text": "Model 6: With New Features\n\n\nCode\nmodel6_hw &lt;- lm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    Percent_Taking_Public_Trans + Percent_White + Med_Inc +\n    as.factor(start_station) +\n    rush_hour * Temperature +\n    perfect_weather + is_holiday + weekend_nice,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred6 = predict(model6_hw, newdata = test_hw))\n\nmae6 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred6), na.rm = TRUE)\n\ncat(\"Model 6 (Improved) MAE:\", round(mae6, 3), \"\\n\")\n\n\nModel 6 (Improved) MAE: 0.887 \n\n\nCode\ncat(\"Improvement from Model 5:\", round((mae5 - mae6) / mae5 * 100, 2), \"%\\n\")\n\n\nImprovement from Model 5: 0 %"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#feature-impact-analysis",
+    "href": "assignments/assignment5/HW5.html#feature-impact-analysis",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Feature Impact Analysis",
+    "text": "Feature Impact Analysis\n\n\nCode\nweather_impact &lt;- test_hw %&gt;%\n  group_by(perfect_weather) %&gt;%\n  summarize(\n    Avg_Actual = mean(Trip_Count, na.rm = TRUE),\n    Avg_Predicted = mean(pred6, na.rm = TRUE),\n    MAE = mean(abs(Trip_Count - pred6), na.rm = TRUE),\n    n = n()\n  ) %&gt;%\n  mutate(Weather = ifelse(perfect_weather == 1, \"Perfect Weather\", \"Other Weather\"))\n\nggplot(weather_impact, aes(x = Weather)) +\n  geom_col(aes(y = Avg_Actual, fill = \"Actual\"), \n           alpha = 0.7, position = position_dodge(width = 0.8), width = 0.4) +\n  geom_col(aes(y = Avg_Predicted, fill = \"Predicted\"), \n           alpha = 0.7, position = position_dodge(width = 0.8), width = 0.4) +\n  scale_fill_manual(values = c(\"Actual\" = \"#08519c\", \"Predicted\" = \"#6baed6\")) +\n  labs(\n    title = \"Impact of Perfect Weather on Ridership\",\n    subtitle = \"Average trips per hour\",\n    x = \"Weather Condition\",\n    y = \"Average Trips\",\n    fill = \"\"\n  ) +\n  plotTheme"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#count-models",
+    "href": "assignments/assignment5/HW5.html#count-models",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Count Models",
+    "text": "Count Models\n\nPoisson Regression\n\n\nCode\nmodel_poisson &lt;- glm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    perfect_weather + is_holiday,\n  family = poisson(link = \"log\"),\n  data = train_hw\n)\n\nmodel_nb &lt;- glm.nb(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    perfect_weather + is_holiday,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(\n    pred_poisson = predict(model_poisson, newdata = test_hw, type = \"response\"),\n    pred_nb = predict(model_nb, newdata = test_hw, type = \"response\")\n  )\n\nmae_poisson &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred_poisson), na.rm = TRUE)\nmae_nb &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred_nb), na.rm = TRUE)\n\ncat(\"Poisson MAE:\", round(mae_poisson, 3), \"\\n\")\n\n\nPoisson MAE: 0.94 \n\n\nCode\ncat(\"Negative Binomial MAE:\", round(mae_nb, 3), \"\\n\")\n\n\nNegative Binomial MAE: 0.94"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#final-model-comparison",
+    "href": "assignments/assignment5/HW5.html#final-model-comparison",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Final Model Comparison",
+    "text": "Final Model Comparison\n\n\nCode\nfinal_comparison &lt;- tibble(\n  Model = c(\n    \"1. Time + Weather\", \n    \"2. + Temporal Lags\", \n    \"3. + Demographics\", \n    \"4. + Station FE\",\n    \"5. + Rush Hour Int\", \n    \"6. + New Features\",\n    \"7. Poisson\", \n    \"8. Negative Binomial\"\n  ),\n  MAE = c(mae1, mae2, mae3, mae4, mae5, mae6, mae_poisson, mae_nb)\n) %&gt;%\n  mutate(\n    Improvement = round((first(MAE) - MAE) / first(MAE) * 100, 1),\n    Rank = rank(MAE)\n  ) %&gt;%\n  arrange(Rank)\n\nkable(final_comparison, digits = 3,\n      caption = \"Table 4: Final Model Comparison - All 8 Models\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE) %&gt;%\n  row_spec(which.min(final_comparison$MAE), \n           bold = TRUE, background = \"#3182bd\", color = \"white\")\n\n\n\nTable 4: Final Model Comparison - All 8 Models\n\n\nModel\nMAE\nImprovement\nRank\n\n\n\n\n5. + Rush Hour Int\n0.887\n14.0\n1\n\n\n6. + New Features\n0.887\n14.0\n2\n\n\n4. + Station FE\n0.895\n13.3\n3\n\n\n3. + Demographics\n0.916\n11.3\n4\n\n\n2. + Temporal Lags\n0.918\n11.0\n5\n\n\n8. Negative Binomial\n0.940\n8.9\n6\n\n\n7. Poisson\n0.940\n8.9\n7\n\n\n1. Time + Weather\n1.032\n0.0\n8\n\n\n\n\n\nCode\nggplot(final_comparison, aes(x = reorder(Model, MAE), y = MAE, fill = as.factor(Rank))) +\n  geom_col(alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 3)), hjust = -0.1, size = 3.5) +\n  coord_flip() +\n  scale_fill_viridis_d(option = \"plasma\", direction = -1) +\n  labs(\n    title = \"Final Model Comparison - All 8 Models\",\n    subtitle = \"Q3 2024 Test Set Performance\",\n    x = \"\",\n    y = \"Mean Absolute Error (trips per hour)\"\n  ) +\n  plotTheme +\n  theme(legend.position = \"none\")"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#operational-implications",
+    "href": "assignments/assignment5/HW5.html#operational-implications",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "1. Operational Implications",
+    "text": "1. Operational Implications\nOur best model (Model 1: 5. + Rush Hour Int) achieves an MAE of 0.887 trips per hour on Q3 2024 test data, representing a 14% improvement over the baseline.\nLooking at temporal patterns, I notice that errors are highest during 4. PM Rush (MAE = 1.1) compared to 1. Overnight (MAE = 0.62). This makes sense because rush hour demand is less predictable - people leave work at different times, and weather affects their decisions differently than during stable mid-day periods.\nMy recommendation: Deploy a hybrid system that uses this model for high-volume stations during stable periods, but relies on historical averages plus real-time adjustments for low-volume stations and volatile time periods. Always include human oversight for unusual events like concerts, sports games, or severe weather that the model cannot capture. The model should inform but not fully automate rebalancing decisions."
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#equity-considerations",
+    "href": "assignments/assignment5/HW5.html#equity-considerations",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "2. Equity Considerations",
+    "text": "2. Equity Considerations\nOur demographic analysis reveals concerning patterns. Looking at income-based errors, High Income neighborhoods have MAE = NaN while Low Income neighborhoods have MAE = NaN.\nAdditionally, I found that Majority White neighborhoods have higher prediction errors (MAE = NaN) compared to Majority Non-White neighborhoods (MAE = NaN).\nThis pattern means we’re better at predicting demand in wealthier, whiter areas where bikes are already more available. Less accurate predictions in underserved neighborhoods could lead to fewer bikes being allocated when residents need them, perpetuating existing transportation inequities.\nRecommended safeguards:\n\nSet minimum service levels for all neighborhoods regardless of predicted demand\nTrack prediction accuracy by neighborhood demographics monthly\nInvest in understanding unmet demand through surveys and community engagement\nConsider equity adjustments to rebalancing algorithms that prioritize underserved areas\nMonitor whether prediction errors translate to actual service disparities"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#model-limitations",
+    "href": "assignments/assignment5/HW5.html#model-limitations",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "3. Model Limitations",
+    "text": "3. Model Limitations\nWhat our model misses:\n\nSpecial events: When I looked at high-error observations, several coincided with major events (concerts, sports games, festivals). Our weather and time features cannot predict these demand spikes without event data.\nWeather perception vs. reality: People decide whether to bike based on weather forecasts and feels-like temperature, not the actual conditions we measure. A 65°F day feels different in July versus September.\nUnmet demand: We only see completed trips. If a station runs out of bikes, we interpret this as “low demand” when it’s actually “unmet demand.” This creates a systematic bias in our training data that makes us predict lower demand than actually exists at popular stations.\nNetwork effects: Our model treats each station independently, but in reality, demand at one station affects demand at nearby stations through the flow of bikes. A station running out of bikes pushes demand to neighbors.\n\nWith more time, I would:\n\nIncorporate real-time station status (bikes available) as a feature\nBuild separate models for different station types (residential, commercial, tourist)\nAdd event data from city calendars and social media\nTest model robustness on data from different seasons and years\nDevelop methods to estimate unmet demand from station outages\nExplore spatial models that account for network effects between stations"
+  },
+  {
+    "objectID": "assignments/assignment5/HW5.html#conclusion",
+    "href": "assignments/assignment5/HW5.html#conclusion",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Conclusion",
+    "text": "Conclusion\nMachine learning can meaningfully improve bike-share demand prediction, but technical performance alone isn’t enough. A model that works better in wealthy neighborhoods isn’t truly “better” - it’s optimizing for the wrong metric and could worsen existing inequities.\nThe real challenge is building a system that provides equitable, reliable service while remaining financially sustainable. This requires technical sophistication (like our improved models), operational flexibility (human oversight and adjustments), and ethical constraints that prioritize fairness over pure predictive accuracy.\nFinal recommendation: Deploy cautiously with strong equity safeguards, monitor continuously across demographic groups, and remain humble about prediction limitations. The goal should be to support - not replace - human decision-making in bike rebalancing operations.\n\nAnalysis completed: 2025-11-25\nTotal models tested: 8\nBest model: 5. + Rush Hour Int\nBest MAE: 0.887 trips per hour"
   }
 ]
