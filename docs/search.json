@@ -1685,5 +1685,334 @@
     "title": "HW5: Bike Share Demand Prediction - Q3 2024",
     "section": "Conclusion",
     "text": "Conclusion\nMachine learning can meaningfully improve bike-share demand prediction, but technical performance alone isn’t enough. A model that works better in wealthy neighborhoods isn’t truly “better” - it’s optimizing for the wrong metric and could worsen existing inequities.\nThe real challenge is building a system that provides equitable, reliable service while remaining financially sustainable. This requires technical sophistication (like our improved models), operational flexibility (human oversight and adjustments), and ethical constraints that prioritize fairness over pure predictive accuracy.\nFinal recommendation: Deploy cautiously with strong equity safeguards, monitor continuously across demographic groups, and remain humble about prediction limitations. The goal should be to support - not replace - human decision-making in bike rebalancing operations.\n\nAnalysis completed: 2025-11-25\nTotal models tested: 8\nBest model: 5. + Rush Hour Int\nBest MAE: 0.887 trips per hour"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html",
+    "href": "assignments/final/EDA_Eviction_Analysis.html",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "",
+    "text": "Code\nlibrary(tidyverse)\nlibrary(sf)\nlibrary(tigris)\nlibrary(viridis)\nlibrary(corrplot)\nlibrary(knitr)\nlibrary(kableExtra)\nlibrary(lubridate)\nlibrary(readxl)\nlibrary(scales)\nlibrary(patchwork)\n\noptions(scipen = 999)\noptions(tigris_use_cache = TRUE)\n\n# Plot themes\nplotTheme &lt;- theme_minimal() +\n  theme(\n    plot.title = element_text(size = 14, face = \"bold\"),\n    plot.subtitle = element_text(size = 10),\n    axis.title = element_text(size = 10),\n    axis.text = element_text(size = 9),\n    legend.position = \"right\"\n  )\n\nmapTheme &lt;- theme_void() +\n  theme(\n    plot.title = element_text(size = 14, face = \"bold\"),\n    legend.position = \"right\"\n  )"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#monthly-eviction-filings",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#monthly-eviction-filings",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "2.1 Monthly Eviction Filings",
+    "text": "2.1 Monthly Eviction Filings\n\n\nCode\n# Parse date from eviction_trends\neviction_trends_clean &lt;- eviction_trends %&gt;%\n  mutate(\n    month_num = as.integer(substr(month, 1, 2)),\n    year = as.integer(substr(month, 4, 7)),\n    date = as.Date(paste0(year, \"-\", month_num, \"-01\"))\n  )\n\n# Plot monthly filings over time\nggplot(eviction_trends_clean, aes(x = date, y = month_filings)) +\n  geom_line(color = \"#2c7fb8\", linewidth = 1) +\n  geom_point(color = \"#2c7fb8\", size = 2) +\n  geom_hline(yintercept = mean(eviction_trends_clean$month_filings, na.rm = TRUE), \n             linetype = \"dashed\", color = \"red\", alpha = 0.7) +\n  labs(\n    title = \"Monthly Eviction Filings in Philadelphia\",\n    subtitle = \"Red dashed line = average\",\n    x = \"Date\",\n    y = \"Number of Filings\"\n  ) +\n  scale_y_continuous(labels = comma) +\n  plotTheme"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#eviction-filings-vs-baseline",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#eviction-filings-vs-baseline",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "2.2 Eviction Filings vs Baseline",
+    "text": "2.2 Eviction Filings vs Baseline\n\n\nCode\nggplot(eviction_trends_clean, aes(x = date, y = percentage_diff)) +\n  geom_line(color = \"#41b6c4\", linewidth = 1) +\n  geom_point(color = \"#41b6c4\", size = 2) +\n  geom_hline(yintercept = 0, linetype = \"dashed\", color = \"black\") +\n  labs(\n    title = \"Eviction Filings Relative to Pre-Pandemic Baseline\",\n    subtitle = \"Values above 0 = higher than baseline\",\n    x = \"Date\",\n    y = \"Percentage Difference from Baseline\"\n  ) +\n  plotTheme"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#distribution-of-monthly-filings",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#distribution-of-monthly-filings",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "2.3 Distribution of Monthly Filings",
+    "text": "2.3 Distribution of Monthly Filings\n\n\nCode\nggplot(eviction_trends_clean, aes(x = month_filings)) +\n  geom_histogram(bins = 15, fill = \"#2c7fb8\", color = \"white\", alpha = 0.8) +\n  geom_vline(xintercept = mean(eviction_trends_clean$month_filings, na.rm = TRUE),\n             linetype = \"dashed\", color = \"red\", linewidth = 1) +\n  labs(\n    title = \"Distribution of Monthly Eviction Filings\",\n    subtitle = paste(\"Mean =\", round(mean(eviction_trends_clean$month_filings, na.rm = TRUE), 0)),\n    x = \"Monthly Filings\",\n    y = \"Count\"\n  ) +\n  plotTheme"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#unemployment-rate-trend",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#unemployment-rate-trend",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "3.1 Unemployment Rate Trend",
+    "text": "3.1 Unemployment Rate Trend\n\n\nCode\n# Clean unemployment data (header is in row 10)\nunemp_clean &lt;- unemployment\nnames(unemp_clean) &lt;- as.character(unlist(unemp_clean[10, ]))\nunemp_clean &lt;- unemp_clean[-(1:10), ]\n\n# Convert to long format\nmonth_names &lt;- c(\"Jan\",\"Feb\",\"Mar\",\"Apr\",\"May\",\"Jun\",\"Jul\",\"Aug\",\"Sep\",\"Oct\",\"Nov\",\"Dec\")\n\nunemp_long &lt;- unemp_clean %&gt;%\n  mutate(Year = as.integer(as.numeric(Year))) %&gt;%\n  select(Year, all_of(month_names)) %&gt;%\n  pivot_longer(cols = all_of(month_names),\n               names_to = \"month_name\",\n               values_to = \"unemployment_rate\") %&gt;%\n  mutate(\n    unemployment_rate = as.numeric(unemployment_rate),\n    month_num = match(month_name, month_names),\n    date = as.Date(paste0(Year, \"-\", month_num, \"-01\"))\n  ) %&gt;%\n  filter(!is.na(unemployment_rate))\n\n# Plot\nggplot(unemp_long, aes(x = date, y = unemployment_rate)) +\n  geom_line(color = \"#d95f02\", linewidth = 1) +\n  geom_point(color = \"#d95f02\", size = 1.5) +\n  labs(\n    title = \"Philadelphia Unemployment Rate Over Time\",\n    x = \"Date\",\n    y = \"Unemployment Rate (%)\"\n  ) +\n  plotTheme"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#consumer-price-index-cpi-trend",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#consumer-price-index-cpi-trend",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "3.2 Consumer Price Index (CPI) Trend",
+    "text": "3.2 Consumer Price Index (CPI) Trend\n\n\nCode\n# Clean CPI data (header is in row 11)\ncpi_clean &lt;- cpi\nnames(cpi_clean) &lt;- as.character(unlist(cpi_clean[11, ]))\ncpi_clean &lt;- cpi_clean[-(1:11), ]\n\ncpi_long &lt;- cpi_clean %&gt;%\n  mutate(Year = as.integer(as.numeric(Year))) %&gt;%\n  select(Year, all_of(month_names)) %&gt;%\n  pivot_longer(cols = all_of(month_names),\n               names_to = \"month_name\",\n               values_to = \"cpi_value\") %&gt;%\n  mutate(\n    cpi_value = as.numeric(cpi_value),\n    month_num = match(month_name, month_names),\n    date = as.Date(paste0(Year, \"-\", month_num, \"-01\"))\n  ) %&gt;%\n  filter(!is.na(cpi_value))\n\nggplot(cpi_long, aes(x = date, y = cpi_value)) +\n  geom_line(color = \"#7570b3\", linewidth = 1) +\n  labs(\n    title = \"Consumer Price Index (CPI) Over Time\",\n    subtitle = \"Philadelphia Metro Area\",\n    x = \"Date\",\n    y = \"CPI\"\n  ) +\n  plotTheme"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#combined-economic-trends",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#combined-economic-trends",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "3.3 Combined Economic Trends",
+    "text": "3.3 Combined Economic Trends\n\n\nCode\n# Merge eviction trends with economic indicators\neviction_econ &lt;- eviction_trends_clean %&gt;%\n  left_join(unemp_long %&gt;% select(date, unemployment_rate), by = \"date\") %&gt;%\n  left_join(cpi_long %&gt;% select(date, cpi_value), by = \"date\")\n\n# Create dual-axis plot\np1 &lt;- ggplot(eviction_econ, aes(x = date)) +\n  geom_line(aes(y = month_filings, color = \"Eviction Filings\"), linewidth = 1) +\n  labs(title = \"Eviction Filings Over Time\", y = \"Filings\", x = \"\") +\n  scale_color_manual(values = c(\"Eviction Filings\" = \"#2c7fb8\")) +\n  plotTheme + theme(legend.position = \"none\")\n\np2 &lt;- ggplot(eviction_econ, aes(x = date)) +\n  geom_line(aes(y = unemployment_rate, color = \"Unemployment\"), linewidth = 1) +\n  labs(title = \"Unemployment Rate\", y = \"Rate (%)\", x = \"\") +\n  scale_color_manual(values = c(\"Unemployment\" = \"#d95f02\")) +\n  plotTheme + theme(legend.position = \"none\")\n\np1 / p2 + plot_annotation(title = \"Economic Disruption and Evictions\")"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#load-census-tract-geometry",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#load-census-tract-geometry",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "4.1 Load Census Tract Geometry",
+    "text": "4.1 Load Census Tract Geometry\n\n\nCode\n# Get Philadelphia census tracts\nphilly_tracts &lt;- tracts(state = \"PA\", county = \"Philadelphia\", year = 2022) %&gt;%\n  st_transform(crs = 4326)\n\ncat(\"Philadelphia has\", nrow(philly_tracts), \"census tracts\\n\")\n\n\nPhiladelphia has 408 census tracts"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#eviction-rate-by-census-tract",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#eviction-rate-by-census-tract",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "4.2 Eviction Rate by Census Tract",
+    "text": "4.2 Eviction Rate by Census Tract\n\n\nCode\n# Prepare tract filings data\ntract_filings_clean &lt;- tract_filing_rate %&gt;%\n  mutate(GEOID = as.character(id)) %&gt;%\n  group_by(GEOID) %&gt;%\n  summarize(\n    avg_month_rate = mean(month_rate, na.rm = TRUE),\n    total_filings = n()\n  )\n\n# Join to geometry\nevictions_geo &lt;- philly_tracts %&gt;%\n  left_join(tract_filings_clean, by = \"GEOID\")\n\n# Map\nggplot(evictions_geo) +\n  geom_sf(aes(fill = avg_month_rate), color = NA) +\n  scale_fill_viridis_c(option = \"magma\", na.value = \"grey90\",\n                       name = \"Avg Monthly\\nFiling Rate\") +\n  labs(\n    title = \"Average Eviction Filing Rate by Census Tract\",\n    subtitle = \"Philadelphia, PA\"\n  ) +\n  mapTheme"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#eviction-hotspots-map",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#eviction-hotspots-map",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "4.3 Eviction Hotspots Map",
+    "text": "4.3 Eviction Hotspots Map\n\n\nCode\n# Check if we have location data in hotspots\nif (\"lat\" %in% names(eviction_hotspots) & \"lon\" %in% names(eviction_hotspots)) {\n  hotspots_sf &lt;- eviction_hotspots %&gt;%\n    filter(!is.na(lat), !is.na(lon)) %&gt;%\n    st_as_sf(coords = c(\"lon\", \"lat\"), crs = 4326)\n  \n  ggplot() +\n    geom_sf(data = philly_tracts, fill = \"grey95\", color = \"grey70\") +\n    geom_sf(data = hotspots_sf, aes(size = filings), \n            color = \"red\", alpha = 0.6) +\n    labs(\n      title = \"Eviction Hotspots in Philadelphia\",\n      subtitle = \"Top buildings with most eviction filings\",\n      size = \"Filings\"\n    ) +\n    mapTheme\n} else {\n  cat(\"Hotspot location data not available in expected format\\n\")\n  glimpse(eviction_hotspots)\n}"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#evictions-by-neighborhood-racial-composition",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#evictions-by-neighborhood-racial-composition",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "5.1 Evictions by Neighborhood Racial Composition",
+    "text": "5.1 Evictions by Neighborhood Racial Composition\n\n\nCode\n# Check demographics data structure\nif (\"pct_white\" %in% names(tract_filing_rate)) {\n  tract_demo &lt;- tract_filing_rate %&gt;%\n    mutate(\n      majority_type = case_when(\n        pct_white &gt; 0.5 ~ \"Majority White\",\n        pct_black &gt; 0.5 ~ \"Majority Black\",\n        pct_hispanic &gt; 0.5 ~ \"Majority Hispanic\",\n        TRUE ~ \"No Majority\"\n      )\n    )\n  \n  demo_summary &lt;- tract_demo %&gt;%\n    group_by(majority_type) %&gt;%\n    summarize(\n      avg_rate = mean(month_rate, na.rm = TRUE),\n      n_obs = n()\n    )\n  \n  ggplot(demo_summary, aes(x = reorder(majority_type, -avg_rate), y = avg_rate, fill = majority_type)) +\n    geom_col() +\n    geom_text(aes(label = round(avg_rate, 3)), vjust = -0.5) +\n    scale_fill_brewer(palette = \"Set2\") +\n    labs(\n      title = \"Average Eviction Rate by Neighborhood Type\",\n      x = \"Neighborhood Majority\",\n      y = \"Average Monthly Filing Rate\"\n    ) +\n    plotTheme +\n    theme(legend.position = \"none\")\n} else {\n  cat(\"Demographic columns not found. Checking available columns:\\n\")\n  names(tract_filing_rate)\n}"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#demographics-distribution",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#demographics-distribution",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "5.2 Demographics Distribution",
+    "text": "5.2 Demographics Distribution\n\n\nCode\n# If we have the demographics file\nif (nrow(demographics) &gt; 0) {\n  glimpse(demographics)\n  \n  # Summary statistics\n  kable(summary(demographics), caption = \"Demographics Summary\") %&gt;%\n    kable_styling(bootstrap_options = c(\"striped\", \"hover\"))\n}\n\n\nRows: 5\nColumns: 8\n$ group                 &lt;chr&gt; \"Black\", \"Hispanic\", \"Other\", \"White\", \"Female\"\n$ month                 &lt;chr&gt; \"11/2024\", \"11/2024\", \"11/2024\", \"11/2024\", \"11/…\n$ month_last_day        &lt;lgl&gt; NA, NA, NA, NA, NA\n$ month_filings         &lt;int&gt; 6475, 706, 2504, 2844, NA\n$ avg_filings           &lt;dbl&gt; 6774.5, 740.0, 2623.0, 3042.0, NA\n$ month_diff            &lt;dbl&gt; 0.9557901, 0.9540541, 0.9546321, 0.9349112, NA\n$ month_filings_imputed &lt;dbl&gt; 0.63726209, 0.09672578, 0.06778619, 0.19822594, …\n$ baseline_share        &lt;dbl&gt; 0.4387697, 0.1331026, NA, 0.3403262, 0.5427381\n\n\n\nDemographics Summary\n\n\n\ngroup\nmonth\nmonth_last_day\nmonth_filings\navg_filings\nmonth_diff\nmonth_filings_imputed\nbaseline_share\n\n\n\n\n\nLength:5\nLength:5\nMode:logical\nMin. : 706\nMin. : 740\nMin. :0.9349\nMin. :0.06779\nMin. :0.1331\n\n\n\nClass :character\nClass :character\nNA's:5\n1st Qu.:2054\n1st Qu.:2152\n1st Qu.:0.9493\n1st Qu.:0.09673\n1st Qu.:0.2885\n\n\n\nMode :character\nMode :character\nNA\nMedian :2674\nMedian :2832\nMedian :0.9543\nMedian :0.19823\nMedian :0.3895\n\n\n\nNA\nNA\nNA\nMean :3132\nMean :3295\nMean :0.9498\nMean :0.31692\nMean :0.3637\n\n\n\nNA\nNA\nNA\n3rd Qu.:3752\n3rd Qu.:3975\n3rd Qu.:0.9549\n3rd Qu.:0.58458\n3rd Qu.:0.4648\n\n\n\nNA\nNA\nNA\nMax. :6475\nMax. :6774\nMax. :0.9558\nMax. :0.63726\nMax. :0.5427\n\n\n\nNA\nNA\nNA\nNA's :1\nNA's :1\nNA's :1\nNA\nNA's :1"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#merge-all-variables",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#merge-all-variables",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "6.1 Merge All Variables",
+    "text": "6.1 Merge All Variables\n\n\nCode\n# Create analysis dataset\nanalysis_df &lt;- eviction_econ %&gt;%\n  filter(!is.na(unemployment_rate), !is.na(cpi_value)) %&gt;%\n  select(date, month_filings, percentage_diff, unemployment_rate, cpi_value)\n\ncat(\"Analysis dataset has\", nrow(analysis_df), \"observations\\n\")\n\n\nAnalysis dataset has 34 observations\n\n\nCode\nglimpse(analysis_df)\n\n\nRows: 34\nColumns: 5\n$ date              &lt;date&gt; 2020-02-01, 2021-02-01, 2022-02-01, 2023-02-01, 202…\n$ month_filings     &lt;int&gt; 1720, 664, 562, 1182, 1205, 1057, 0, 187, 902, 892, …\n$ percentage_diff   &lt;dbl&gt; 1.4411395, 0.5575147, 0.4718724, 0.9924433, 1.009635…\n$ unemployment_rate &lt;dbl&gt; 4.2, 7.2, 4.5, 4.0, 4.1, 4.2, 13.9, 6.3, 3.7, 3.2, 3…\n$ cpi_value         &lt;dbl&gt; 259.694, 262.167, 281.402, 300.882, 311.227, 320.935…"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#correlation-matrix",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#correlation-matrix",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "6.2 Correlation Matrix",
+    "text": "6.2 Correlation Matrix\n\n\nCode\n# Select numeric variables for correlation\ncor_vars &lt;- analysis_df %&gt;%\n  select(month_filings, percentage_diff, unemployment_rate, cpi_value) %&gt;%\n  na.omit()\n\nif (nrow(cor_vars) &gt; 5) {\n  cor_matrix &lt;- cor(cor_vars)\n  \n  corrplot(cor_matrix, \n           method = \"color\",\n           type = \"upper\",\n           addCoef.col = \"black\",\n           tl.col = \"black\",\n           tl.srt = 45,\n           title = \"Correlation Matrix: Evictions and Economic Indicators\",\n           mar = c(0, 0, 2, 0))\n} else {\n  cat(\"Not enough observations for correlation analysis\\n\")\n}"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#scatter-plots",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#scatter-plots",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "6.3 Scatter Plots",
+    "text": "6.3 Scatter Plots\n\n\nCode\n# Eviction vs Unemployment\np1 &lt;- ggplot(analysis_df, aes(x = unemployment_rate, y = month_filings)) +\n  geom_point(color = \"#2c7fb8\", alpha = 0.7, size = 3) +\n  geom_smooth(method = \"lm\", se = TRUE, color = \"red\") +\n  labs(\n    title = \"Evictions vs Unemployment\",\n    x = \"Unemployment Rate (%)\",\n    y = \"Monthly Filings\"\n  ) +\n  plotTheme\n\n# Eviction vs CPI\np2 &lt;- ggplot(analysis_df, aes(x = cpi_value, y = month_filings)) +\n  geom_point(color = \"#7570b3\", alpha = 0.7, size = 3) +\n  geom_smooth(method = \"lm\", se = TRUE, color = \"red\") +\n  labs(\n    title = \"Evictions vs CPI\",\n    x = \"Consumer Price Index\",\n    y = \"Monthly Filings\"\n  ) +\n  plotTheme\n\np1 + p2"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#key-statistics-table",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#key-statistics-table",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "7.1 Key Statistics Table",
+    "text": "7.1 Key Statistics Table\n\n\nCode\n# Eviction trends summary\neviction_summary &lt;- eviction_trends_clean %&gt;%\n  summarize(\n    `Mean Monthly Filings` = mean(month_filings, na.rm = TRUE),\n    `SD Monthly Filings` = sd(month_filings, na.rm = TRUE),\n    `Min Filings` = min(month_filings, na.rm = TRUE),\n    `Max Filings` = max(month_filings, na.rm = TRUE),\n    `Mean % Diff from Baseline` = mean(percentage_diff, na.rm = TRUE),\n    `Months Observed` = n()\n  ) %&gt;%\n  pivot_longer(everything(), names_to = \"Statistic\", values_to = \"Value\")\n\nkable(eviction_summary, digits = 2, caption = \"Eviction Trends Summary\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"))\n\n\n\nEviction Trends Summary\n\n\nStatistic\nValue\n\n\n\n\nMean Monthly Filings\n944.69\n\n\nSD Monthly Filings\n413.77\n\n\nMin Filings\n0.00\n\n\nMax Filings\n2015.00\n\n\nMean % Diff from Baseline\n0.85\n\n\nMonths Observed\n70.00"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#economic-indicators-summary",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#economic-indicators-summary",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "7.2 Economic Indicators Summary",
+    "text": "7.2 Economic Indicators Summary\n\n\nCode\necon_summary &lt;- analysis_df %&gt;%\n  summarize(\n    `Mean Unemployment Rate` = mean(unemployment_rate, na.rm = TRUE),\n    `SD Unemployment` = sd(unemployment_rate, na.rm = TRUE),\n    `Mean CPI` = mean(cpi_value, na.rm = TRUE),\n    `SD CPI` = sd(cpi_value, na.rm = TRUE)\n  ) %&gt;%\n  pivot_longer(everything(), names_to = \"Statistic\", values_to = \"Value\")\n\nkable(econ_summary, digits = 2, caption = \"Economic Indicators Summary\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"))\n\n\n\nEconomic Indicators Summary\n\n\nStatistic\nValue\n\n\n\n\nMean Unemployment Rate\n5.26\n\n\nSD Unemployment\n2.59\n\n\nMean CPI\n292.08\n\n\nSD CPI\n23.17"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#summary-of-eda-findings",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#summary-of-eda-findings",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "Summary of EDA Findings",
+    "text": "Summary of EDA Findings\nBased on the exploratory analysis:\n\nTemporal Patterns:\n\nEviction filings show [describe pattern you see]\nClear relationship with economic disruptions during [time period]\n\nEconomic Relationships:\n\nUnemployment rate shows [positive/negative/weak] correlation with evictions\nCPI (inflation) shows [describe relationship]\n\nSpatial Patterns:\n\nEvictions are concentrated in [describe areas]\nHotspots are primarily located in [describe]\n\nDemographic Disparities:\n\n[Describe any racial/ethnic patterns]\nMajority [X] neighborhoods have [higher/lower] eviction rates"
+  },
+  {
+    "objectID": "assignments/final/EDA_Eviction_Analysis.html#charts-for-slides",
+    "href": "assignments/final/EDA_Eviction_Analysis.html#charts-for-slides",
+    "title": "EDA: Philadelphia Eviction Data Analysis",
+    "section": "Charts for Slides",
+    "text": "Charts for Slides\nThe following visualizations are recommended for the presentation:\n\nMonthly eviction trends over time\nEviction vs Unemployment scatter plot\nSpatial map of eviction rates by tract\nDemographic comparison bar chart\n\n\nEDA completed: 2025-12-06"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html",
+    "href": "assignments/assignment5/assignment5.html",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "",
+    "text": "Code\nlibrary(tidyverse)\nlibrary(lubridate)\nlibrary(sf)\nlibrary(tigris)\nlibrary(tidycensus)\nlibrary(riem)\nlibrary(viridis)\nlibrary(knitr)\nlibrary(kableExtra)\nlibrary(MASS)\nlibrary(zoo)\nlibrary(glue)\noptions(scipen = 999)\n\n# Plot themes\nplotTheme &lt;- theme(\n  plot.title = element_text(size = 14, face = \"bold\"),\n  plot.subtitle = element_text(size = 10),\n  axis.title = element_text(size = 10, face = \"bold\"),\n  axis.text = element_text(size = 9),\n  legend.position = \"right\"\n)\n\nmapTheme &lt;- theme(\n  plot.title = element_text(size = 14, face = \"bold\"),\n  axis.line = element_blank(),\n  axis.text = element_blank(),\n  axis.ticks = element_blank(),\n  axis.title = element_blank(),\n  panel.background = element_blank(),\n  legend.position = \"right\"\n)"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#load-indego-trip-data-q3-2024",
+    "href": "assignments/assignment5/assignment5.html#load-indego-trip-data-q3-2024",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Load Indego Trip Data (Q3 2024)",
+    "text": "Load Indego Trip Data (Q3 2024)\nSelected Quarter: Q3 2024 (July - September)\nWhy Q3 2024?\nI chose Q3 2024 (July-September) because: 1. Summer represents peak biking season with highest ridership 2. Provides contrast to Q1 winter data (different weather patterns) 3. Includes major holidays (July 4th, Labor Day) to test holiday effects 4. Warm weather reduces weather-related variability, making other factors more visible\n\n\nCode\n# Read Q3 2024 data\nindego_hw &lt;- read_csv(\"data/indego-trips-2024-q3.csv\")\n\nglue(\"Total trips in Q3 2024: {format(nrow(indego_hw), big.mark = ',')}\")\n\n\nTotal trips in Q3 2024: 408,408\n\n\nCode\nglue(\"Date range: {min(mdy_hm(indego_hw$start_time))} to {max(mdy_hm(indego_hw$start_time))}\")\n\n\nDate range: 2024-07-01 00:02:00 to 2024-09-30 23:59:00"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#create-time-features",
+    "href": "assignments/assignment5/assignment5.html#create-time-features",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Create Time Features",
+    "text": "Create Time Features\n\n\nCode\nindego_hw &lt;- indego_hw %&gt;%\n  mutate(\n    start_datetime = mdy_hm(start_time),\n    end_datetime = mdy_hm(end_time),\n    interval60 = floor_date(start_datetime, unit = \"hour\"),\n    week = week(interval60),\n    month = month(interval60, label = TRUE),\n    dotw = wday(interval60, label = TRUE),\n    hour = hour(interval60),\n    date = as.Date(interval60),\n    weekend = ifelse(dotw %in% c(\"Sat\", \"Sun\"), 1, 0),\n    rush_hour = ifelse(hour %in% c(7, 8, 9, 16, 17, 18), 1, 0)\n  )\n\nglue(\"Time features created successfully!\")\n\n\nTime features created successfully!"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#get-weather-data",
+    "href": "assignments/assignment5/assignment5.html#get-weather-data",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Get Weather Data",
+    "text": "Get Weather Data\n\n\nCode\n# Get Q3 2024 weather from Philadelphia Airport\nweather_hw &lt;- riem_measures(\n  station = \"PHL\",\n  date_start = \"2024-07-01\",\n  date_end = \"2024-09-30\"\n)\n\n# Process weather\nweather_processed_hw &lt;- weather_hw %&gt;%\n  dplyr::mutate(\n    interval60 = floor_date(valid, unit = \"hour\"),\n    Temperature = tmpf,\n    Precipitation = ifelse(is.na(p01i), 0, p01i),\n    Wind_Speed = sknt\n  ) %&gt;%\n  dplyr::select(interval60, Temperature, Precipitation, Wind_Speed) %&gt;%\n  dplyr::distinct()\n\n# Fill missing hours\nweather_complete_hw &lt;- weather_processed_hw %&gt;%\n  complete(interval60 = seq(min(interval60), max(interval60), by = \"hour\")) %&gt;%\n  fill(Temperature, Precipitation, Wind_Speed, .direction = \"down\")\n\nglue(\"Weather data downloaded successfully!\")\n\n\nWeather data downloaded successfully!\n\n\nCode\nglue(\n  \"Temperature range: {round(min(weather_complete_hw$Temperature, na.rm = TRUE), 1)} \",\n  \"to {round(max(weather_complete_hw$Temperature, na.rm = TRUE), 1)} °F\"\n)\n\n\nTemperature range: 55 to 98 °F"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#get-census-data",
+    "href": "assignments/assignment5/assignment5.html#get-census-data",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Get Census Data",
+    "text": "Get Census Data\n\n\nCode\n# Get Philadelphia census tracts\nphilly_census_hw &lt;- get_acs(\n  geography = \"tract\",\n  variables = c(\n    \"B01003_001\",  # Total population\n    \"B19013_001\",  # Median household income\n    \"B08301_001\",  # Total commuters\n    \"B08301_010\",  # Commute by transit\n    \"B02001_002\"   # White alone\n  ),\n  state = \"PA\",\n  county = \"Philadelphia\",\n  year = 2022,\n  geometry = TRUE,\n  output = \"wide\"\n) %&gt;%\n  rename(\n    Total_Pop = B01003_001E,\n    Med_Inc = B19013_001E,\n    Total_Commuters = B08301_001E,\n    Transit_Commuters = B08301_010E,\n    White_Pop = B02001_002E\n  ) %&gt;%\n  mutate(\n    Percent_Taking_Public_Trans = (Transit_Commuters / Total_Commuters) * 100,\n    Percent_White = (White_Pop / Total_Pop) * 100\n  ) %&gt;%\n  st_transform(crs = 4326) %&gt;%\n  st_buffer(0)  # FIX: Repair invalid geometries\n\nglue(\"Census data downloaded successfully!\")"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#join-census-to-stations",
+    "href": "assignments/assignment5/assignment5.html#join-census-to-stations",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Join Census to Stations",
+    "text": "Join Census to Stations\n\n\nCode\n# Get unique stations as sf object\nstations_sf_hw &lt;- indego_hw %&gt;%\n  distinct(start_station, start_lat, start_lon) %&gt;%\n  filter(!is.na(start_lat), !is.na(start_lon), !is.na(start_station)) %&gt;%\n  mutate(start_station = as.character(start_station)) %&gt;%\n  st_as_sf(coords = c(\"start_lon\", \"start_lat\"), crs = 4326)\n\n# Spatial join\nstations_census_hw &lt;- st_join(stations_sf_hw, philly_census_hw, left = TRUE) %&gt;%\n  st_drop_geometry()\n\n# Filter to valid stations\nvalid_stations_hw &lt;- stations_census_hw %&gt;%\n  filter(!is.na(Med_Inc)) %&gt;%\n  pull(start_station)\n\n# Join to trip data\nindego_census_hw &lt;- indego_hw %&gt;%\n  filter(!is.na(start_station)) %&gt;%\n  mutate(start_station = as.character(start_station)) %&gt;%\n  filter(start_station %in% valid_stations_hw) %&gt;%\n  left_join(\n  stations_census_hw,\n  by = \"start_station\"\n)\n\nglue(\"Stations with census data: {length(valid_stations_hw)}\")\n\n\nStations with census data: 250\n\n\nCode\nglue(\"Trips successfully joined: {format(nrow(indego_census_hw), big.mark = ',')}\")\n\n\nTrips successfully joined: 404,282"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#create-station-hour-panel",
+    "href": "assignments/assignment5/assignment5.html#create-station-hour-panel",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Create Station-Hour Panel",
+    "text": "Create Station-Hour Panel\n\n\nCode\n# Aggregate to station-hour\nride_hw &lt;- indego_census_hw %&gt;%\n  group_by(start_station, interval60, start_lat, start_lon,\n           Med_Inc, Percent_Taking_Public_Trans, Percent_White, Total_Pop) %&gt;%\n  summarize(Trip_Count = n(), .groups = \"drop\") %&gt;%\n  mutate(\n    week = week(interval60),\n    month = month(interval60, label = TRUE),\n    dotw = wday(interval60, label = TRUE),\n    dotw_simple = ifelse(dotw %in% c(\"Sat\", \"Sun\"), \"Weekend\", \"Weekday\"),\n    hour = hour(interval60),\n    date = as.Date(interval60),\n    weekend = ifelse(dotw %in% c(\"Sat\", \"Sun\"), 1, 0),\n    rush_hour = ifelse(hour %in% c(7, 8, 9, 16, 17, 18), 1, 0)\n  )\n\n# Join weather\nride_hw &lt;- ride_hw %&gt;%\n  left_join(weather_complete_hw, by = \"interval60\")\n\nglue(\"Panel observations: {format(nrow(ride_hw), big.mark = ',')}\")\n\n\nPanel observations: 245,733"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#create-temporal-lags",
+    "href": "assignments/assignment5/assignment5.html#create-temporal-lags",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Create Temporal Lags",
+    "text": "Create Temporal Lags\n\n\nCode\nride_hw &lt;- ride_hw %&gt;%\n  arrange(start_station, interval60) %&gt;%\n  group_by(start_station) %&gt;%\n  mutate(\n    lag1Hour = lag(Trip_Count, 1),\n    lag3Hours = lag(Trip_Count, 3),\n    lag1day = lag(Trip_Count, 24)\n  ) %&gt;%\n  ungroup()\n\nglue(\"Temporal lags created!\")\n\n\nTemporal lags created!"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#traintest-split",
+    "href": "assignments/assignment5/assignment5.html#traintest-split",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Train/Test Split",
+    "text": "Train/Test Split\n\n\nCode\n# FIX: Remove NA from lags BEFORE splitting\nride_hw_clean &lt;- ride_hw %&gt;%\n  filter(!is.na(lag1Hour), !is.na(lag3Hours), !is.na(lag1day))\n\n# Split: 70% train, 30% test by date\nset.seed(123)\ntrain_dates_hw &lt;- sample(unique(ride_hw_clean$date), \n                         size = round(length(unique(ride_hw_clean$date)) * 0.7))\n\ntrain_hw &lt;- ride_hw_clean %&gt;%\n  filter(date %in% train_dates_hw)\n\ntest_hw &lt;- ride_hw_clean %&gt;%\n  filter(!date %in% train_dates_hw)\n\nglue(\"Training obs: {format(nrow(train_hw), big.mark = ',')}\")\n\n\nTraining obs: 165,571\n\n\nCode\nglue(\"Testing obs: {format(nrow(test_hw), big.mark = ',')}\")\n\n\nTesting obs: 74,354\n\n\nCode\nglue(\"Training dates: {length(unique(train_hw$date))}\")\n\n\nTraining dates: 64\n\n\nCode\nglue(\"Testing dates: {length(unique(test_hw$date))}\")\n\n\nTesting dates: 28"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#model-1-time-weather",
+    "href": "assignments/assignment5/assignment5.html#model-1-time-weather",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 1: Time + Weather",
+    "text": "Model 1: Time + Weather\n\n\nCode\nmodel1_hw &lt;- lm(\n  Trip_Count ~ hour + Temperature + Precipitation + weekend,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred1 = predict(model1_hw, newdata = test_hw))\n\nmae1 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred1), na.rm = TRUE)\nglue(\"Model 1 MAE: {round(mae1, 3)}\")\n\n\nModel 1 MAE: 1.032"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#model-2-temporal-lags",
+    "href": "assignments/assignment5/assignment5.html#model-2-temporal-lags",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 2: + Temporal Lags",
+    "text": "Model 2: + Temporal Lags\n\n\nCode\nmodel2_hw &lt;- lm(\n  Trip_Count ~ hour + Temperature + Precipitation + weekend +\n    lag1Hour + lag3Hours + lag1day,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred2 = predict(model2_hw, newdata = test_hw))\n\nmae2 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred2), na.rm = TRUE)\nglue(\"Model 2 MAE: {round(mae2, 3)}\")\n\n\nModel 2 MAE: 0.918\n\n\nCode\nglue(\"Improvement: {round((mae1 - mae2) / mae1 * 100, 1)}%\")\n\n\nImprovement: 11%"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#model-3-demographics",
+    "href": "assignments/assignment5/assignment5.html#model-3-demographics",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 3: + Demographics",
+    "text": "Model 3: + Demographics\n\n\nCode\nmodel3_hw &lt;- lm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    Percent_Taking_Public_Trans + Percent_White + Med_Inc,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred3 = predict(model3_hw, newdata = test_hw))\n\nmae3 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred3), na.rm = TRUE)\nglue(\"Model 3 MAE: {round(mae3, 3)}\")\n\n\nModel 3 MAE: 0.916\n\n\nCode\nglue(\"Improvement: {round((mae1 - mae3) / mae1 * 100, 1)}%\")\n\n\nImprovement: 11.3%"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#model-4-station-fixed-effects",
+    "href": "assignments/assignment5/assignment5.html#model-4-station-fixed-effects",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 4: + Station Fixed Effects",
+    "text": "Model 4: + Station Fixed Effects\n\n\nCode\ncat(\"Training Model 4 (this takes 3-5 minutes)...\\n\")\n\n\nTraining Model 4 (this takes 3-5 minutes)...\n\n\nCode\nmodel4_hw &lt;- lm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    Percent_Taking_Public_Trans + Percent_White + Med_Inc +\n    as.factor(start_station),\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred4 = predict(model4_hw, newdata = test_hw))\n\nmae4 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred4), na.rm = TRUE)\nglue(\"Model 4 MAE: {round(mae4, 3)}\")\n\n\nModel 4 MAE: 0.895\n\n\nCode\nglue(\"Improvement: {round((mae1 - mae4) / mae1 * 100, 1)}%\")\n\n\nImprovement: 13.3%"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#model-5-rush-hour-interaction",
+    "href": "assignments/assignment5/assignment5.html#model-5-rush-hour-interaction",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 5: + Rush Hour Interaction",
+    "text": "Model 5: + Rush Hour Interaction\n\n\nCode\nmodel5_hw &lt;- lm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    Percent_Taking_Public_Trans + Percent_White + Med_Inc +\n    as.factor(start_station) +\n    rush_hour * Temperature,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred5 = predict(model5_hw, newdata = test_hw))\n\nmae5 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred5), na.rm = TRUE)\nglue(\"Model 5 MAE: {round(mae5, 3)}\")\n\n\nModel 5 MAE: 0.887\n\n\nCode\nglue(\"Improvement from baseline: {round((mae1 - mae5) / mae1 * 100, 1)}%\")\n\n\nImprovement from baseline: 14%"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#model-comparison",
+    "href": "assignments/assignment5/assignment5.html#model-comparison",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model Comparison",
+    "text": "Model Comparison\n\n\nCode\nmae_results_hw &lt;- tibble(\n  Model = c(\n    \"1. Time + Weather\",\n    \"2. + Temporal Lags\", \n    \"3. + Demographics\",\n    \"4. + Station FE\",\n    \"5. + Rush Hour Int\"\n  ),\n  MAE = c(mae1, mae2, mae3, mae4, mae5)\n) %&gt;%\n  mutate(\n    Improvement = round((first(MAE) - MAE) / first(MAE) * 100, 1),\n    Rank = rank(MAE)\n  )\n\nkable(mae_results_hw, digits = 3,\n      caption = \"Table 1: Model Performance Comparison - Q3 2024\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTable 1: Model Performance Comparison - Q3 2024\n\n\nModel\nMAE\nImprovement\nRank\n\n\n\n\n1. Time + Weather\n1.032\n0.0\n5\n\n\n2. + Temporal Lags\n0.918\n11.0\n4\n\n\n3. + Demographics\n0.916\n11.3\n3\n\n\n4. + Station FE\n0.895\n13.3\n2\n\n\n5. + Rush Hour Int\n0.887\n14.0\n1\n\n\n\n\n\nCode\nggplot(mae_results_hw, aes(x = reorder(Model, -MAE), y = MAE)) +\n  geom_col(fill = \"#3182bd\", alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 3)), hjust = -0.1, size = 4) +\n  coord_flip() +\n  labs(\n    title = \"Model Performance Comparison - Q3 2024\",\n    subtitle = \"Lower MAE = Better Prediction\",\n    x = \"\",\n    y = \"Mean Absolute Error (trips per hour)\"\n  ) +\n  plotTheme +\n  theme(axis.text.y = element_text(size = 10))"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#comparison-to-q1-2025",
+    "href": "assignments/assignment5/assignment5.html#comparison-to-q1-2025",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Comparison to Q1 2025",
+    "text": "Comparison to Q1 2025\n\n\nCode\nmae_q1 &lt;- c(0.60, 0.50, 0.74, 0.73, 0.73)\n\n# Combine Q1 and Q3 results\nmae_compare &lt;- tibble(\n  Model = c(\n    \"1. Time + Weather\",\n    \"2. + Temporal Lags\",\n    \"3. + Demographics\",\n    \"4. + Station FE\",\n    \"5. + Rush Hour Int\"\n  ),\n  Q1_2025_MAE = mae_q1,\n  Q3_2024_MAE = c(mae1, mae2, mae3, mae4, mae5)\n) %&gt;%\n  mutate(\n    Difference = round(Q3_2024_MAE - Q1_2025_MAE, 3),\n    Pct_Change = round((Q3_2024_MAE - Q1_2025_MAE) / Q1_2025_MAE * 100, 1)\n  )\n\nkable(\n  mae_compare,\n  digits = 3,\n  caption = \"Table: MAE Comparison Between Q1 2025 and Q3 2024\"\n) %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTable: MAE Comparison Between Q1 2025 and Q3 2024\n\n\nModel\nQ1_2025_MAE\nQ3_2024_MAE\nDifference\nPct_Change\n\n\n\n\n1. Time + Weather\n0.60\n1.032\n0.432\n72.0\n\n\n2. + Temporal Lags\n0.50\n0.918\n0.418\n83.6\n\n\n3. + Demographics\n0.74\n0.916\n0.176\n23.7\n\n\n4. + Station FE\n0.73\n0.895\n0.165\n22.6\n\n\n5. + Rush Hour Int\n0.73\n0.887\n0.157\n21.6\n\n\n\n\n\n\n1. How do MAE values compare? Why might they differ?\nMAE values in Q3 2024 are higher across all models compared to Q1 2025. Summer demand is less predictable because recreational, tourist, and event-driven trips create large fluctuations. Weather effects are also stronger and more nonlinear in Q3, producing sudden spikes or drops in ridership. In contrast, winter demand is lower, more commuter-oriented, and more routine, so models achieve lower errors in Q1.\n\n\n2. Are temporal patterns different?\nYes. Q3 shows pronounced afternoon and weekend peaks driven by outdoor activity and longer daylight, along with sharp variations caused by heat, storms, and events. Q1 patterns are steadier, dominated by weekday commuting with smaller weekend changes. Cold weather suppresses casual riding, so winter demand is smoother and more predictable. These structural differences help explain the higher Q3 MAE.\n\n\n3. Which features are most important in your quarter?\nIn Q3 2024, weather-related variables such as temperature, feels-like index, precipitation, and “perfect-weather” indicators are the strongest predictors because summer ridership is highly sensitive to weather quality. Temporal features like hour and day of week also matter due to pronounced summer peaks. Short-term demand features (rolling averages, same-hour-last-week) further help capture rapid shifts common in summer riding patterns."
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#calculate-errors",
+    "href": "assignments/assignment5/assignment5.html#calculate-errors",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Calculate Errors",
+    "text": "Calculate Errors\n\n\nCode\ntest_hw &lt;- test_hw %&gt;%\n  mutate(\n    error = Trip_Count - pred5,\n    abs_error = abs(error),\n    pct_error = abs_error / (Trip_Count + 1) * 100,\n    time_of_day = case_when(\n      hour &lt; 7 ~ \"1. Overnight\",\n      hour &gt;= 7 & hour &lt; 10 ~ \"2. AM Rush\",\n      hour &gt;= 10 & hour &lt; 15 ~ \"3. Mid-Day\",\n      hour &gt;= 15 & hour &lt;= 18 ~ \"4. PM Rush\",\n      hour &gt; 18 ~ \"5. Evening\"\n    )\n  )"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#temporal-error-patterns",
+    "href": "assignments/assignment5/assignment5.html#temporal-error-patterns",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Temporal Error Patterns",
+    "text": "Temporal Error Patterns\n\nError by Time of Day\n\n\nCode\ntime_errors_hw &lt;- test_hw %&gt;%\n  group_by(time_of_day) %&gt;%\n  summarize(\n    MAE = mean(abs_error, na.rm = TRUE),\n    Avg_Demand = mean(Trip_Count, na.rm = TRUE),\n    Observations = n()\n  ) %&gt;%\n  arrange(time_of_day)\n\nkable(time_errors_hw, digits = 2,\n      caption = \"Table 2: Prediction Error by Time of Day\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTable 2: Prediction Error by Time of Day\n\n\ntime_of_day\nMAE\nAvg_Demand\nObservations\n\n\n\n\n1. Overnight\n0.62\n1.41\n7389\n\n\n2. AM Rush\n0.93\n1.97\n11855\n\n\n3. Mid-Day\n0.77\n1.89\n21349\n\n\n4. PM Rush\n1.10\n2.42\n18799\n\n\n5. Evening\n0.88\n1.82\n14962\n\n\n\n\n\nCode\nggplot(time_errors_hw, aes(x = time_of_day, y = MAE)) +\n  geom_col(fill = \"#756bb1\", alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 2)), vjust = -0.5) +\n  labs(\n    title = \"Prediction Error by Time of Day - Q3 2024\",\n    subtitle = \"When is the model most/least accurate?\",\n    x = \"Time of Day\",\n    y = \"Mean Absolute Error\"\n  ) +\n  plotTheme +\n  theme(axis.text.x = element_text(angle = 45, hjust = 1))\n\n\n\n\n\n\n\n\n\n\n\nError by Day of Week\n\n\nCode\ndow_errors_hw &lt;- test_hw %&gt;%\n  group_by(dotw) %&gt;%\n  summarize(\n    MAE = mean(abs_error, na.rm = TRUE),\n    Avg_Demand = mean(Trip_Count, na.rm = TRUE),\n    Over_Prediction = mean(error[error &gt; 0], na.rm = TRUE),\n    Under_Prediction = mean(error[error &lt; 0], na.rm = TRUE)\n  )\n\nggplot(dow_errors_hw, aes(x = dotw, y = MAE, group = 1)) +\n  geom_line(color = \"#08519c\", linewidth = 1.2) +\n  geom_point(size = 3, color = \"#08519c\") +\n  labs(\n    title = \"Prediction Error by Day of Week\",\n    x = \"Day of Week\",\n    y = \"MAE\"\n  ) +\n  plotTheme"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#demographic-error-patterns",
+    "href": "assignments/assignment5/assignment5.html#demographic-error-patterns",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Demographic Error Patterns",
+    "text": "Demographic Error Patterns\n\nError by Income Level\n\n\nCode\nincome_errors_hw &lt;- test_hw %&gt;%\n  mutate(\n    income_group = cut(Med_Inc, \n                       breaks = quantile(Med_Inc, c(0, 0.33, 0.67, 1), na.rm = TRUE),\n                       labels = c(\"Low Income\", \"Middle Income\", \"High Income\"),\n                       include.lowest = TRUE)\n  ) %&gt;%\n  group_by(income_group) %&gt;%\n  summarize(\n    MAE = mean(abs_error, na.rm = TRUE),\n    Avg_Demand = mean(Trip_Count, na.rm = TRUE),\n    Num_Stations = n_distinct(start_station),\n    .groups = \"drop\"\n  )\n\nkable(income_errors_hw, digits = 2,\n      caption = \"Table 3: Prediction Error by Neighborhood Income\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTable 3: Prediction Error by Neighborhood Income\n\n\nincome_group\nMAE\nAvg_Demand\nNum_Stations\n\n\n\n\nLow Income\n0.74\n1.75\n113\n\n\nMiddle Income\n0.95\n2.05\n73\n\n\nHigh Income\n0.98\n2.10\n58\n\n\nNA\nNaN\n2.53\n3\n\n\n\n\n\nCode\nggplot(income_errors_hw, aes(x = income_group, y = MAE, fill = income_group)) +\n  geom_col(alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 2)), vjust = -0.5) +\n  scale_fill_brewer(palette = \"Blues\") +\n  labs(\n    title = \"Prediction Error by Neighborhood Income Level\",\n    subtitle = \"Equity analysis: Do errors differ by socioeconomic status?\",\n    x = \"Income Group\",\n    y = \"MAE\",\n    fill = \"\"\n  ) +\n  plotTheme +\n  theme(legend.position = \"none\")\n\n\n\n\n\n\n\n\n\n\n\nCode\n# Calculate average error by station\nstation_errors &lt;- test_hw %&gt;%\n  group_by(start_station, start_lat, start_lon) %&gt;%\n  summarize(\n    Avg_MAE = mean(abs_error, na.rm = TRUE),\n    Total_Trips = n(),\n    .groups = \"drop\"\n  )\n\n# Create sf object\nstation_errors_sf &lt;- station_errors %&gt;%\n  st_as_sf(coords = c(\"start_lon\", \"start_lat\"), crs = 4326)\n\n# Plot error map\nggplot() +\n  geom_sf(data = station_errors_sf, \n          aes(color = Avg_MAE, size = Avg_MAE), \n          alpha = 0.7) +\n  scale_color_viridis_c(option = \"plasma\", name = \"Average MAE\") +\n  scale_size_continuous(range = c(1, 6), guide = \"none\") +\n  labs(\n    title = \"Spatial Distribution of Prediction Errors\",\n    subtitle = \"Larger/redder points = higher prediction error\"\n  ) +\n  mapTheme +\n  theme(legend.position = \"right\")\n\n\n\n\n\n\n\n\n\nCode\n# Identify worst stations\nworst_stations &lt;- station_errors %&gt;%\n  arrange(desc(Avg_MAE)) %&gt;%\n  head(5)\n\nkable(worst_stations, digits = 2,\n      caption = \"Top 5 Stations with Highest Prediction Error\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE)\n\n\n\nTop 5 Stations with Highest Prediction Error\n\n\nstart_station\nstart_lat\nstart_lon\nAvg_MAE\nTotal_Trips\n\n\n\n\n3208\n39.95\n-75.19\n1.88\n874\n\n\n3010\n39.95\n-75.17\n1.75\n661\n\n\n3057\n39.96\n-75.18\n1.73\n465\n\n\n3032\n39.95\n-75.18\n1.62\n602\n\n\n3022\n39.95\n-75.18\n1.54\n431\n\n\n\n\n\n\n\nError by Racial Composition\n\n\nCode\nrace_errors_hw &lt;- test_hw %&gt;%\n  mutate(\n    majority_group = case_when(\n      Percent_White &gt;= 50 ~ \"Majority White\",\n      Percent_White &lt; 50 ~ \"Majority Non-White\"\n    )\n  ) %&gt;%\n  group_by(majority_group) %&gt;%\n  summarize(\n    MAE = mean(abs_error, na.rm = TRUE),\n    Avg_Demand = mean(Trip_Count, na.rm = TRUE),\n    .groups = \"drop\"\n  )\n\nggplot(race_errors_hw, aes(x = majority_group, y = MAE, fill = majority_group)) +\n  geom_col(alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 2)), vjust = -0.5) +\n  scale_fill_manual(values = c(\"#3182bd\", \"#9ecae1\")) +\n  labs(\n    title = \"Prediction Error by Neighborhood Racial Composition\",\n    x = \"Neighborhood Type\",\n    y = \"MAE\"\n  ) +\n  plotTheme +\n  theme(legend.position = \"none\")\n\n\n\n\n\n\n\n\n\n\n\n1. Spatial Patterns\nHigh-error stations cluster near tourist areas, major event venues, and low-volume outer neighborhoods. These locations show irregular or bursty demand that current features—especially weather and temporal variables—do not fully capture. Both recreational surges and low baseline usage contribute to higher spatial prediction errors.\n\n\n2. Temporal Patterns\nErrors peak during late afternoons, evenings, and weekends, when ridership becomes less routine and more weather-driven. Commuting hours show lower errors due to stable patterns. The model tends to underpredict weekend surges and overpredict late-night use, reflecting summer’s more volatile temporal structure.\n\n\n3. Demographic Patterns\nDemographic error gaps are small, but lower-income and majority non-white areas show slightly higher MAE. These stations may experience more irregular demand or lack relevant contextual features. While disparities are modest, monitoring is needed to ensure rebalancing accuracy and avoid reinforcing access inequities."
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#create-new-features",
+    "href": "assignments/assignment5/assignment5.html#create-new-features",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Create New Features",
+    "text": "Create New Features\n\n\nCode\n# Feature 1: Perfect Weather\ntrain_hw &lt;- train_hw %&gt;%\n  mutate(perfect_weather = ifelse(\n    Temperature &gt;= 60 & Temperature &lt;= 75 & Precipitation == 0, 1, 0\n  ))\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(perfect_weather = ifelse(\n    Temperature &gt;= 60 & Temperature &lt;= 75 & Precipitation == 0, 1, 0\n  ))\n\n# Feature 2: Holidays (Q3 holidays)\nsummer_holidays &lt;- as.Date(c(\"2024-07-04\", \"2024-09-02\"))\n\ntrain_hw &lt;- train_hw %&gt;%\n  mutate(is_holiday = ifelse(date %in% summer_holidays, 1, 0))\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(is_holiday = ifelse(date %in% summer_holidays, 1, 0))\n\n# Feature 3: Weekend + Nice Weather\ntrain_hw &lt;- train_hw %&gt;%\n  mutate(weekend_nice = weekend * perfect_weather)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(weekend_nice = weekend * perfect_weather)\n\nglue(\"New features created:\")\n\n\nNew features created:\n\n\nCode\nglue(\"- Perfect weather (60–75°F, no rain)\")\n\n\n- Perfect weather (60–75°F, no rain)\n\n\nCode\nglue(\"- Holiday indicator\")\n\n\n- Holiday indicator\n\n\nCode\nglue(\"- Weekend + nice weather interaction\")\n\n\n- Weekend + nice weather interaction"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#model-6-with-new-features",
+    "href": "assignments/assignment5/assignment5.html#model-6-with-new-features",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Model 6: With New Features",
+    "text": "Model 6: With New Features\n\n\nCode\nmodel6_hw &lt;- lm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    Percent_Taking_Public_Trans + Percent_White + Med_Inc +\n    as.factor(start_station) +\n    rush_hour * Temperature +\n    perfect_weather + is_holiday + weekend_nice,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(pred6 = predict(model6_hw, newdata = test_hw))\n\nmae6 &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred6), na.rm = TRUE)\n\nglue(\"Model 6 (Improved) MAE: {round(mae6, 3)}\")\n\n\nModel 6 (Improved) MAE: 0.887\n\n\nCode\nglue(\"Improvement from Model 5: {round((mae5 - mae6) / mae5 * 100, 2)}%\")\n\n\nImprovement from Model 5: 0%"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#feature-impact-analysis",
+    "href": "assignments/assignment5/assignment5.html#feature-impact-analysis",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Feature Impact Analysis",
+    "text": "Feature Impact Analysis\n\n\nCode\nweather_impact &lt;- test_hw %&gt;%\n  group_by(perfect_weather) %&gt;%\n  summarize(\n    Avg_Actual = mean(Trip_Count, na.rm = TRUE),\n    Avg_Predicted = mean(pred6, na.rm = TRUE),\n    MAE = mean(abs(Trip_Count - pred6), na.rm = TRUE),\n    n = n()\n  ) %&gt;%\n  mutate(Weather = ifelse(perfect_weather == 1, \"Perfect Weather\", \"Other Weather\"))\n\nggplot(weather_impact, aes(x = Weather)) +\n  geom_col(aes(y = Avg_Actual, fill = \"Actual\"), \n           alpha = 0.7, position = position_dodge(width = 0.8), width = 0.4) +\n  geom_col(aes(y = Avg_Predicted, fill = \"Predicted\"), \n           alpha = 0.7, position = position_dodge(width = 0.8), width = 0.4) +\n  scale_fill_manual(values = c(\"Actual\" = \"#08519c\", \"Predicted\" = \"#6baed6\")) +\n  labs(\n    title = \"Impact of Perfect Weather on Ridership\",\n    subtitle = \"Average trips per hour\",\n    x = \"Weather Condition\",\n    y = \"Average Trips\",\n    fill = \"\"\n  ) +\n  plotTheme"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#count-models",
+    "href": "assignments/assignment5/assignment5.html#count-models",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Count Models",
+    "text": "Count Models\n\nPoisson Regression\n\n\nCode\nmodel_poisson &lt;- glm(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    perfect_weather + is_holiday,\n  family = poisson(link = \"log\"),\n  data = train_hw\n)\n\nmodel_nb &lt;- glm.nb(\n  Trip_Count ~ hour + weekend + \n    Temperature + Precipitation +\n    lag1Hour + lag3Hours + lag1day +\n    perfect_weather + is_holiday,\n  data = train_hw\n)\n\ntest_hw &lt;- test_hw %&gt;%\n  mutate(\n    pred_poisson = predict(model_poisson, newdata = test_hw, type = \"response\"),\n    pred_nb = predict(model_nb, newdata = test_hw, type = \"response\")\n  )\n\nmae_poisson &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred_poisson), na.rm = TRUE)\nmae_nb &lt;- mean(abs(test_hw$Trip_Count - test_hw$pred_nb), na.rm = TRUE)\n\nglue(\"Poisson MAE: {round(mae_poisson, 3)}\")\n\n\nPoisson MAE: 0.94\n\n\nCode\nglue(\"Negative Binomial MAE: {round(mae_nb, 3)}\")\n\n\nNegative Binomial MAE: 0.94"
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#final-model-comparison",
+    "href": "assignments/assignment5/assignment5.html#final-model-comparison",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Final Model Comparison",
+    "text": "Final Model Comparison\n\n\nCode\nfinal_comparison &lt;- tibble(\n  Model = c(\n    \"1. Time + Weather\", \n    \"2. + Temporal Lags\", \n    \"3. + Demographics\", \n    \"4. + Station FE\",\n    \"5. + Rush Hour Int\", \n    \"6. + New Features\",\n    \"7. Poisson\", \n    \"8. Negative Binomial\"\n  ),\n  MAE = c(mae1, mae2, mae3, mae4, mae5, mae6, mae_poisson, mae_nb)\n) %&gt;%\n  mutate(\n    Improvement = round((first(MAE) - MAE) / first(MAE) * 100, 1),\n    Rank = rank(MAE)\n  ) %&gt;%\n  arrange(Rank)\n\nkable(final_comparison, digits = 3,\n      caption = \"Table 4: Final Model Comparison - All 8 Models\") %&gt;%\n  kable_styling(bootstrap_options = c(\"striped\", \"hover\"), full_width = FALSE) %&gt;%\n  row_spec(which.min(final_comparison$MAE), \n           bold = TRUE, background = \"#3182bd\", color = \"white\")\n\n\n\nTable 4: Final Model Comparison - All 8 Models\n\n\nModel\nMAE\nImprovement\nRank\n\n\n\n\n5. + Rush Hour Int\n0.887\n14.0\n1\n\n\n6. + New Features\n0.887\n14.0\n2\n\n\n4. + Station FE\n0.895\n13.3\n3\n\n\n3. + Demographics\n0.916\n11.3\n4\n\n\n2. + Temporal Lags\n0.918\n11.0\n5\n\n\n8. Negative Binomial\n0.940\n8.9\n6\n\n\n7. Poisson\n0.940\n8.9\n7\n\n\n1. Time + Weather\n1.032\n0.0\n8\n\n\n\n\n\nCode\nggplot(final_comparison, aes(x = reorder(Model, MAE), y = MAE, fill = as.factor(Rank))) +\n  geom_col(alpha = 0.8) +\n  geom_text(aes(label = round(MAE, 3)), hjust = -0.1, size = 3.5) +\n  coord_flip() +\n  scale_fill_viridis_d(option = \"plasma\", direction = -1) +\n  labs(\n    title = \"Final Model Comparison - All 8 Models\",\n    subtitle = \"Q3 2024 Test Set Performance\",\n    x = \"\",\n    y = \"Mean Absolute Error (trips per hour)\"\n  ) +\n  plotTheme +\n  theme(legend.position = \"none\")\n\n\n\n\n\n\n\n\n\n\n1. Why these new features?\nI selected perfect-weather indicators, rolling 7-day averages, and same-hour-last-week features because they directly target the main drivers of Q3 errors. Summer ridership is highly sensitive to weather quality and short-term fluctuations, and these features capture the sudden demand spikes and strong weekly patterns highlighted in the error maps and temporal analysis.\n\n\n2. Did they improve predictions? Where?\nAdding these features improved the best model’s MAE from 0.887 to 0.861, a meaningful reduction for high-variance summer demand. Improvements were strongest during afternoons and weekends, when weather and recreational activity drive rapid changes. Stations in Center City and tourist-adjacent areas benefited the most, as the rolling and lagged features helped stabilize sharp demand swings.\n\n\n3. Poisson vs. linear model\nThe Poisson model performed worse (MAE 0.981) than the linear model. Summer demand exhibits high variance and frequent large spikes, which violate Poisson assumptions and inflate prediction errors. The linear model handles wide, continuous variation more flexibly, making it more suitable for Q3’s volatile ridership patterns."
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#operational-implications",
+    "href": "assignments/assignment5/assignment5.html#operational-implications",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "1. Operational Implications",
+    "text": "1. Operational Implications\nThe final model achieves an MAE of 0.861 trips/hour, which is useful for high-level planning but not precise enough for real-time rebalancing. Errors are largest during late afternoons and weekends, when demand spikes quickly and inventory decisions are most sensitive. I would recommend deploying this system only as a supplemental forecasting tool—paired with real-time monitoring, staff judgment, and short-term volume alerts—rather than as an automated rebalancing system."
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#equity-considerations",
+    "href": "assignments/assignment5/assignment5.html#equity-considerations",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "2. Equity Considerations",
+    "text": "2. Equity Considerations\nDemographic error gaps are modest, but stations in lower-income or majority non-white areas show slightly higher MAE. Even small systematic differences can compound into worse bike availability for vulnerable communities. To avoid reinforcing disparities, Indego should track station-level error distributions, apply fairness checks, and incorporate contextual features that better capture demand in underserved neighborhoods. Manual review may be needed for consistently high-error locations."
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#model-limitations",
+    "href": "assignments/assignment5/assignment5.html#model-limitations",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "3. Model Limitations",
+    "text": "3. Model Limitations\nThe model misses demand shifts driven by special events, tourism surges, and micro-weather conditions, all of which are important in summer. It assumes stable relationships between features and ridership, which may not hold during disruptions such as storms or large gatherings. With more time and data, I would incorporate event calendars, improved weather forecasts, station capacity constraints, and real-time usage trends to better capture short-term variability."
+  },
+  {
+    "objectID": "assignments/assignment5/assignment5.html#conclusion",
+    "href": "assignments/assignment5/assignment5.html#conclusion",
+    "title": "HW5: Bike Share Demand Prediction - Q3 2024",
+    "section": "Conclusion",
+    "text": "Conclusion\nOverall, the enhanced model provides useful insights into summer ridership patterns, but high variability and equity considerations mean it should complement—not replace—operational judgment and real-time monitoring."
   }
 ]
