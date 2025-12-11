@@ -2847,5 +2847,110 @@
     "title": "Assignment 3 — Midterm Project Data Access",
     "section": "",
     "text": "You can access and download all project data from the following link:\nGoogle Drive — Assignment 3 Midterm Data"
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "",
+    "text": "Property taxes depend on OPA’s assessed values.\n\nAssessments often deviate from actual sale prices.\n\nSome areas are consistently over- or under-assessed.\n\nUnequal assessments create unfair tax burdens.\n\n\n\n\n\nSource: Reinvestment Fund, Examining the Accuracy, Uniformity & Equity of Philadelphia’s 2023 Real Estate Assessments (Apr 2024)."
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#are-current-property-tax-assessments-in-philadelphia-fair-and-accurate",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#are-current-property-tax-assessments-in-philadelphia-fair-and-accurate",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "",
+    "text": "Property taxes depend on OPA’s assessed values.\n\nAssessments often deviate from actual sale prices.\n\nSome areas are consistently over- or under-assessed.\n\nUnequal assessments create unfair tax burdens.\n\n\n\n\n\nSource: Reinvestment Fund, Examining the Accuracy, Uniformity & Equity of Philadelphia’s 2023 Real Estate Assessments (Apr 2024)."
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#motivations",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#motivations",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "Motivations",
+    "text": "Motivations\nFairness: Ensure residents pay taxes aligned with true property values.\nTransparency: Build trust through objective, data-based methods.\nEfficiency: Improve city revenue stability and policy planning.\n\nTraditional assessments rely on outdated, manual approaches.\n\n\nMachine learning models can better capture local market dynamics."
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#data-sources",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#data-sources",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "Data Sources",
+    "text": "Data Sources\n\nPhiladelphia Property Sales (n= 24023,2023-2024)\nCensus ACS (Income, Education, Poverty)\nOpenDataPhilly (Number and Distance: Crime, Park&Recreation, Transportation, Hospital,School )"
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#spatial-distribution-of-housing-and-prices",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#spatial-distribution-of-housing-and-prices",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "Spatial Distribution of Housing and Prices",
+    "text": "Spatial Distribution of Housing and Prices\n\n\n\nWhere Are the Houses?\n\n\n\n\nWhere Are the Expensive Houses?"
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#larger-homes-higher-neighborhood-income-and-more-bathrooms-increase-prices-while-older-properties-tend-to-sell-for-less.",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#larger-homes-higher-neighborhood-income-and-more-bathrooms-increase-prices-while-older-properties-tend-to-sell-for-less.",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "Larger homes, higher neighborhood income, and more bathrooms increase prices — while older properties tend to sell for less.",
+    "text": "Larger homes, higher neighborhood income, and more bathrooms increase prices — while older properties tend to sell for less."
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#adding-more-real-world-data-to-build-a-more-fair-and-accurate-housing-price-model",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#adding-more-real-world-data-to-build-a-more-fair-and-accurate-housing-price-model",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "Adding more real-world data to build a more fair and accurate housing price model",
+    "text": "Adding more real-world data to build a more fair and accurate housing price model\nM1: Basic home features (size, age) → simple but limited\nM2: + Census data → adds community context\nM3: + Spatial data → captures location effects\nM4: + Interactions → reflects real neighborhood differences"
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#home-size-and-bathrooms-remain-important-across-all-models-while-neighborhood-and-location-features-gain-influence-after-improving.",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#home-size-and-bathrooms-remain-important-across-all-models-while-neighborhood-and-location-features-gain-influence-after-improving.",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "Home size and bathrooms remain important across all models, while neighborhood and location features gain influence after improving.",
+    "text": "Home size and bathrooms remain important across all models, while neighborhood and location features gain influence after improving.\n\n\n\nBathrooms and Livable area stay top-ranked across all models\n\nIncome and Census tract rise in importance as they’re added\n\nFinal model shows Location Effects becoming dominant predictors of price"
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#model-performance-the-predicted-prices-from-our-final-model-align-strongly-with-actual-sales.",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#model-performance-the-predicted-prices-from-our-final-model-align-strongly-with-actual-sales.",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "Model Performance: The predicted prices from our final model align strongly with actual sales.",
+    "text": "Model Performance: The predicted prices from our final model align strongly with actual sales.\n   &gt; “Average Error($)” shows the average gap between predicted and actual prices (lower = more accurate)."
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#the-map-highlights-neighborhoods-where-predicted-prices-differ-most-from-actual-sales.",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#the-map-highlights-neighborhoods-where-predicted-prices-differ-most-from-actual-sales.",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "The map highlights neighborhoods where predicted prices differ most from actual sales.",
+    "text": "The map highlights neighborhoods where predicted prices differ most from actual sales.\n\n\nInterpretation\nBlue areas: Homes undervalued by the model → may face under-assessment\nRed areas: Homes overvalued → may face over-assessment\nCentral & southern zones: show the largest mismatches — indicating uneven market patterns\n &gt; The areas, shown in deep red or blue, are likely where property assessments are least accurate, and where tax fairness may be at greatest risk.\n &gt; These “hard-to-predict” areas should be prioritized for review in future assessment updates."
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#three-evidence-based-recommendations",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#three-evidence-based-recommendations",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "Three Evidence-Based Recommendations",
+    "text": "Three Evidence-Based Recommendations\nReview Where the Model Shows the Largest Gaps → Our residual analysis pinpoints neighborhoods with the highest prediction errors — the same areas where assessments are likely least fair. Prioritize these zones for reassessment and data verification.\nUse the Model as a Fairness Benchmark → Instead of replacing official assessments, use the model as a cross-check tool to flag properties with unusually high or low assessed-to-predicted ratios.\nInstitutionalize Annual Model Updates → Retrain the model each year using new sales and census data so assessments stay current with real market trends, preventing future inequities."
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#limitations-improvements",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#limitations-improvements",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "Limitations & Improvements",
+    "text": "Limitations & Improvements\nData gaps: Some neighborhoods have limited or inconsistent sales data, and important local factors like school quality or public amenities are not fully represented.\nSpatial variation: The model’s accuracy differs across regions — it performs very well in some areas but less so in others, suggesting that geography strongly influences results.\nSpatial modeling: Next, we will apply models that explicitly account for spatial relationships and neighborhood effects to improve prediction accuracy.\nData enhancement: We plan to expand data coverage in underrepresented areas to reduce bias and strengthen fairness across communities."
+  },
+  {
+    "objectID": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#thank-you",
+    "href": "assignments/assignment3/norender/Yang_Chen_Fang_Gao_Xiang_Zhao_Presentation.html#thank-you",
+    "title": "Philadelphia Housing Price Prediction",
+    "section": "Thank You",
+    "text": "Thank You\n\nTurning Data into Fairer Assessments\n\n\n\n\nProject Team\nXiaoqing Chen\nZicheng Xiang\nLingxuan Gao\nZhiyuan Zhao\nFan Yang\nZhe Fang\n\n\n\nContact\nSixers Consulting 6ers@upenn.edu|www.6ers.com\n\n\n\n\n\nPrepared for the City of Philadelphia — Office of Property Assessment (OPA)"
+  },
+  {
+    "objectID": "assignments/assignment3/norender/readme.html",
+    "href": "assignments/assignment3/norender/readme.html",
+    "title": "Assignment 3 — Midterm Project Data Access",
+    "section": "",
+    "text": "Due to the large size of the dataset used in Assignment 3 (Midterm Project), the data files cannot be uploaded directly to this GitHub repository.\nTo ensure full reproducibility of the analysis, all datasets are stored securely on Google Drive.\n\n\nYou can access and download all project data from the following link:\nGoogle Drive — Assignment 3 Midterm Data"
+  },
+  {
+    "objectID": "assignments/assignment3/norender/readme.html#data-access",
+    "href": "assignments/assignment3/norender/readme.html#data-access",
+    "title": "Assignment 3 — Midterm Project Data Access",
+    "section": "",
+    "text": "You can access and download all project data from the following link:\nGoogle Drive — Assignment 3 Midterm Data"
   }
 ]
