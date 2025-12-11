@@ -72,8 +72,6 @@ theme_map <- function() {
 }
 
 theme_set(theme_map())
-
-cat("✓ Packages loaded successfully\n")
 ```
 
 ------------------------------------------------------------------------
@@ -124,10 +122,6 @@ violations <- read_csv("data/311_Service_Requests_-_Sanitation_Code_Complaints_-
     violation_type = `What is the Nature of this Code Violation?`
   )
 
-cat("✓ Loaded sanitation violations\n")
-cat("  - Total violations:", nrow(violations), "\n")
-cat("  - Date range:", min(violations$creation_date), "to", 
-    max(violations$creation_date), "\n")
 ```
 
 **What we found:** The dataset contains `r nrow(violations)` sanitation code violations from 2017. These represent citizen complaints about various sanitation issues across Chicago.
@@ -194,9 +188,6 @@ fishnet <- st_make_grid(
 # Keep only cells intersecting Chicago
 fishnet <- fishnet[chicagoBoundary, ]
 
-cat("✓ Created fishnet grid\n")
-cat("  - Number of cells:", nrow(fishnet), "\n")
-cat("  - Cell size: 500 x 500 meters\n")
 ```
 
 **Why use a fishnet grid?**
@@ -220,11 +211,6 @@ fishnet <- fishnet %>%
   mutate(countViolations = replace_na(countViolations, 0))
 
 # Summary statistics
-cat("\nViolation count distribution:\n")
-summary(fishnet$countViolations)
-cat("\nCells with zero violations:", 
-    sum(fishnet$countViolations == 0), "/", nrow(fishnet),
-    "(", round(100 * sum(fishnet$countViolations == 0) / nrow(fishnet), 1), "%)\n")
 ```
 
 ```{r visualize-fishnet}
@@ -327,17 +313,13 @@ if (file.exists("data/abandoned_cars_2017.csv")) {
     filter(!is.na(Latitude), !is.na(Longitude)) %>%
     st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) %>%
     st_transform('ESRI:102271')
-  cat("✓ Loaded from local file\n")
 } else {
   # Fallback: Try API (may be slow or fail)
   abandoned_cars <- read_csv("https://data.cityofchicago.org/resource/3c9v-pnva.csv?$limit=50000&$where=creation_date between '2017-01-01T00:00:00' and '2017-12-31T23:59:59'") %>%
     filter(!is.na(latitude), !is.na(longitude)) %>%
     st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
     st_transform('ESRI:102271')
-  cat("✓ Loaded from API\n")
 }
-
-cat("  - Number of abandoned vehicle calls:", nrow(abandoned_cars), "\n")
 ```
 
 **Why use abandoned vehicles as a predictor?**
@@ -347,6 +329,8 @@ Following the "broken windows theory," physical signs of disorder (like abandone
 ## Count Abandoned Vehicles per Cell
 
 ```{r count-abandoned-cars}
+#| output: false
+
 # Aggregate to fishnet
 abandoned_fishnet <- st_join(abandoned_cars, fishnet, join = st_within) %>%
   st_drop_geometry() %>%
@@ -387,11 +371,13 @@ p1 + p2 +
 
 The side-by-side comparison reveals a strong visual correlation between abandoned vehicle calls and sanitation violations. Areas with high concentrations of abandoned cars—particularly on the South Side and West Side—also show elevated sanitation violation counts. This spatial overlap supports the "broken windows theory": visible signs of physical disorder (abandoned vehicles) tend to co-occur with other forms of neighborhood neglect (sanitation problems).
 
-However, the relationship isn't perfectly one-to-one. Some areas with moderate abandoned car counts still experience high sanitation violations, suggesting that other factors (housing density, property ownership patterns, or enforcement priorities) also play a role. This imperfect correlation justifies using abandoned cars as a predictor variable while recognizing it won't explain all the variation in sanitation complaints.\]\*
+However, the relationship isn't perfectly one-to-one. Some areas with moderate abandoned car counts still experience high sanitation violations, suggesting that other factors (housing density, property ownership patterns, or enforcement priorities) also play a role. This imperfect correlation justifies using abandoned cars as a predictor variable while recognizing it won't explain all the variation in sanitation complaints.
 
 ## Calculate Nearest Neighbor Distances
 
 ```{r nn-features}
+#| output: false
+
 # Calculate mean distance to 3 nearest abandoned cars
 fishnet_coords <- st_coordinates(st_centroid(fishnet))
 abandoned_coords <- st_coordinates(abandoned_cars)
@@ -485,11 +471,8 @@ if (nrow(hotspots) > 0) {
         st_distance(st_centroid(fishnet), hotspots %>% st_union())
       )
     )
-  cat("✓ Calculated distance to hot spots\n")
-  cat("  - Number of hot spot cells:", nrow(hotspots), "\n")
 } else {
   fishnet <- fishnet %>% mutate(dist_to_hotspot = 0)
-  cat("⚠ No significant hot spots found\n")
 }
 ```
 
@@ -510,9 +493,6 @@ fishnet <- st_join(
   left = TRUE
 ) %>%
   filter(!is.na(District))
-
-cat("✓ Joined police districts\n")
-cat("  - Districts:", length(unique(fishnet$District)), "\n")
 ```
 
 ------------------------------------------------------------------------
@@ -534,9 +514,6 @@ fishnet_model <- fishnet %>%
     dist_to_hotspot
   ) %>%
   na.omit()
-
-cat("✓ Prepared modeling data\n")
-cat("  - Observations:", nrow(fishnet_model), "\n")
 ```
 
 ## Poisson Regression
@@ -567,18 +544,14 @@ The pattern is clear: spatial proximity to disorder (whether individual abandone
 ## Check for Overdispersion
 
 ```{r check-overdispersion}
+#| output: false
+
 # Calculate dispersion
 dispersion <- sum(residuals(model_poisson, type = "pearson")^2) / 
               model_poisson$df.residual
-
-cat("Dispersion parameter:", round(dispersion, 2), "\n")
-
-if (dispersion > 1.5) {
-  cat("⚠ Overdispersion detected! Negative Binomial is more appropriate.\n")
-} else {
-  cat("✓ Dispersion acceptable for Poisson.\n")
-}
 ```
+
+The dispersion parameter is `r round(dispersion, 2)`, which is much greater than 1.5, indicating severe overdispersion. This means Negative Binomial regression is more appropriate.
 
 **What is overdispersion?**
 
@@ -594,12 +567,9 @@ model_nb <- glm.nb(
 )
 
 summary(model_nb)
-
-# Compare models
-cat("\nModel Comparison:\n")
-cat("Poisson AIC:", round(AIC(model_poisson), 1), "\n")
-cat("Negative Binomial AIC:", round(AIC(model_nb), 1), "\n")
 ```
+
+**Model Comparison:** Poisson AIC = `r round(AIC(model_poisson), 1)` vs. Negative Binomial AIC = `r round(AIC(model_nb), 1)`
 
 **Which model is better?**
 
@@ -614,11 +584,11 @@ The Poisson model's assumption that mean equals variance is badly violated here,
 Standard cross-validation randomly splits data, but with spatial data this means training on cells right next to test cells (spatial leakage!). Leave-One-Group-Out (LOGO) cross-validation trains on all districts except one, testing on the held-out district.
 
 ```{r spatial-cv}
+#| output: false
+
 # LOGO CV
 districts <- unique(fishnet_model$District)
 cv_results <- tibble()
-
-cat("Running spatial cross-validation...\n")
 
 for (i in seq_along(districts)) {
   test_district <- districts[i]
@@ -651,15 +621,10 @@ for (i in seq_along(districts)) {
       rmse = rmse
     )
   )
-  
-  cat("  Fold", i, "- District", test_district, "- MAE:", round(mae, 2), "\n")
 }
-
-# Overall metrics
-cat("\n✓ Cross-Validation Complete\n")
-cat("Mean MAE:", round(mean(cv_results$mae), 2), "\n")
-cat("Mean RMSE:", round(mean(cv_results$rmse), 2), "\n")
 ```
+
+**Cross-Validation Results:** Mean MAE = `r round(mean(cv_results$mae), 2)`, Mean RMSE = `r round(mean(cv_results$rmse), 2)`
 
 ```{r cv-table}
 cv_results %>%
