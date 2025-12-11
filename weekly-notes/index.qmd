@@ -15,11 +15,55 @@ Welcome to my weekly learning reflections for MUSA 5080: Public Policy Analytics
 **Topics:** RStudio setup, Quarto basics, reproducible workflows  
 **[Read Week 1 Notes →](week-01-notes.html)**
 
----
+#### Week 2 - Algorithms & Census Data
+**Date:** September 2025  
+**Topics:** Algorithmic decision-making, tidycensus, margin of error  
+**[Read Week 2 Notes →](week-02-notes.html)**
 
-### Coming Soon
+#### Week 3 - Data Visualization
+**Date:** September 2025  
+**Topics:** ggplot2, grammar of graphics, visual perception  
+**[Read Week 3 Notes →](week-03-notes.html)**
 
-More weekly reflections will be added as the course progresses. Check back regularly for updates!
+#### Week 4 - Spatial Data & GIS
+**Date:** October 2025  
+**Topics:** sf package, spatial predicates, coordinate systems  
+**[Read Week 4 Notes →](week-04-notes.html)**
+
+#### Week 5 - Linear Regression
+**Date:** October 2025  
+**Topics:** OLS regression, feature engineering, model interpretation  
+**[Read Week 5 Notes →](week-05-notes.html)**
+
+#### Week 6 - Spatial ML & Fixed Effects
+**Date:** October 2025  
+**Topics:** Spatial lag, fixed effects, goodness of fit  
+**[Read Week 6 Notes →](week-06-notes.html)**
+
+#### Week 7 - Model Diagnostics
+**Date:** October 2025  
+**Topics:** Spatial autocorrelation, Moran's I, residual analysis  
+**[Read Week 7 Notes →](week-07-notes.html)**
+
+#### Week 9 - Predictive Policing Ethics
+**Date:** November 2025  
+**Topics:** Dirty data, feedback loops, algorithmic bias  
+**[Read Week 9 Notes →](week-09-notes.html)**
+
+#### Week 10 - Logistic Regression
+**Date:** November 2025  
+**Topics:** Binary outcomes, odds ratios, classification thresholds  
+**[Read Week 10 Notes →](week-10-notes.html)**
+
+#### Week 11 - Space-Time Prediction
+**Date:** November 2025  
+**Topics:** Panel data, temporal lags, bike share demand  
+**[Read Week 11 Notes →](week-11-notes.html)**
+
+#### Week 12 - Neighborhood Change
+**Date:** November 2025  
+**Topics:** Sequence analysis, K-means clustering, urban trajectories  
+**[Read Week 12 Notes →](week-12-notes.html)**
 
 ---
 

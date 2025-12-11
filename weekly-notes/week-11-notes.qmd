@@ -1,0 +1,114 @@
+---
+title: "Week 11: Space-Time Prediction"
+subtitle: "MUSA 5080 - Public Policy Analytics"
+date: 2025-11-17
+format:
+  html:
+    toc: true
+    code-fold: true
+---
+
+## Key Concepts
+
+This week tackled predictions that vary in both space AND time - using bike share rebalancing as the motivating example. The challenge: predict demand 1-2 hours ahead so trucks can redistribute bikes before stations empty out.
+
+**Panel data structure:**
+
+Previous weeks used cross-sectional data (each row = one observation at one time). Panel data tracks the same units over multiple time periods:
+
+- Cross-sectional: Station A, total trips in May
+- Panel: Station A at 8am Tuesday, Station A at 9am Tuesday, Station A at 10am Tuesday...
+
+Each row is now a station-hour combination. This lets us capture both station-level differences (downtown vs. residential) and time-varying patterns (rush hour, weekends, weather).
+
+**Why this matters for prediction:**
+
+- Station A downtown has high demand during work hours
+- Station B in a residential area peaks mornings and evenings  
+- Station C near tourist spots is busy on weekends
+
+A model needs to learn these different patterns. Panel structure lets us include station fixed effects (baseline differences) AND time-varying features (what happened last hour, current weather).
+
+**Temporal lags:**
+
+The key innovation is using past values to predict future values. If Station A had 15 trips at 8am, that's useful information for predicting 9am demand. We create lag features:
+
+- lag_1h: trips at this station 1 hour ago
+- lag_same_hour_yesterday: trips at this station at this hour yesterday
+- lag_same_hour_last_week: same hour, same day of week, last week
+
+The intuition: demand is sticky. A station that was busy recently will probably stay busy.
+
+**Binning into time intervals:**
+
+Raw trip data has exact timestamps (8:05:23 AM). We need to aggregate into uniform bins (hourly, 15-minute, etc.) before we can model. The choice of bin size affects what patterns you can capture.
+
+## Coding Techniques
+
+```r
+# Create panel structure: one row per station-hour
+panel_data <- trips %>%
+  mutate(
+    interval60 = floor_date(start_time, unit = "hour")
+  ) %>%
+  group_by(station_id, interval60) %>%
+  summarize(trip_count = n(), .groups = "drop")
+
+# Add temporal features
+panel_data <- panel_data %>%
+  arrange(station_id, interval60) %>%
+  group_by(station_id) %>%
+  mutate(
+    lag_1h = lag(trip_count, 1),
+    lag_2h = lag(trip_count, 2),
+    lag_24h = lag(trip_count, 24)  # same hour yesterday
+  ) %>%
+  ungroup()
+
+# Add time-based features
+panel_data <- panel_data %>%
+  mutate(
+    hour = hour(interval60),
+    day_of_week = wday(interval60, label = TRUE),
+    weekend = day_of_week %in% c("Sat", "Sun"),
+    month = month(interval60)
+  )
+
+# Join weather data
+panel_data <- panel_data %>%
+  left_join(weather, by = "interval60")
+
+# Model with station fixed effects + temporal features + weather
+model <- lm(trip_count ~ factor(station_id) + hour + day_of_week + 
+            temperature + lag_1h + lag_24h, 
+            data = panel_data)
+
+# For predictions, need to be careful about what lag values are available
+# Can't use lag_1h for 2 hours ahead prediction if you don't have 1h ahead yet
+```
+
+The `floor_date()` function from lubridate is clutch for binning timestamps.
+
+## Questions & Challenges
+
+- How do you handle missing lag values? First observation for each station won't have lag_1h. First 24 observations won't have lag_24h.
+- For operational forecasting, how far ahead can you realistically predict? Lag features become unavailable beyond a certain horizon.
+- The panel structure means lots of observations (stations × hours × days). Does this cause problems for model training or should we sample?
+
+## Connections to Policy
+
+Bike share rebalancing has real equity implications:
+
+- If algorithms prioritize high-ridership stations (usually in wealthy areas), underserved neighborhoods get worse service
+- Empty stations in transit deserts mean people miss connections to work
+- The rebalancing trucks themselves have costs - route optimization vs. coverage tradeoffs
+
+More broadly, space-time prediction applies to emergency services (ambulance positioning), public transit (schedule optimization), 311 call response, and resource allocation across city departments.
+
+The temporal dimension adds urgency. For house prices, being wrong by a day doesn't matter much. For bike rebalancing or ambulance dispatch, minutes matter.
+
+## Reflection
+
+Panel data felt like a conceptual leap. I'm used to thinking about spatial variation (different neighborhoods) or temporal variation (trends over time) separately. Combining them means way more data but also way more complexity in feature engineering.
+
+The lag features make intuitive sense - recent demand predicts near-future demand. But there's something circular about it: to predict 9am, I need 8am data, but to predict 8am, I need 7am data, etc. The operational constraint is how far ahead you actually need to act.

@@ -1,0 +1,91 @@
+---
+title: "Week 6: Spatial Machine Learning & Fixed Effects"
+subtitle: "MUSA 5080 - Public Policy Analytics"
+date: 2025-10-14
+format:
+  html:
+    toc: true
+    code-fold: true
+---
+
+## Key Concepts
+
+Building on last week's regression with spatial features. The motivating example: predicting house prices. A 1,000 sqft house in Back Bay is worth way more than the same house in Roxbury. Location matters, and we need to capture it.
+
+**Hedonic model framework:**
+
+Price = structural features + neighborhood features + locational features. Structural is bedrooms, bathrooms, sqft. Neighborhood is schools, crime, amenities. Locational is distance to downtown, transit access, etc.
+
+**Tobler's First Law in regression:**
+
+"Near things are more related than distant things." This is a problem for OLS because it assumes independent observations. If errors in nearby houses are correlated, our standard errors are wrong and significance tests don't mean what we think they mean.
+
+**Spatial autocorrelation:**
+
+Nearby locations have similar values. Makes sense for house prices - a neighborhood is either desirable or not, and that affects all houses in it. But it violates OLS assumptions. We need to either account for spatial structure in the model or acknowledge the limitation.
+
+**Fixed effects:**
+
+Include neighborhood as a categorical variable. Each neighborhood gets its own intercept (baseline price level). The (n-1) rule: with 10 neighborhoods, you get 9 dummy variables. The "missing" one becomes the reference category (alphabetically first by default). Coefficients for other neighborhoods represent the difference from that reference.
+
+This was the big "aha" moment: baseline model R² = 0.13, add neighborhood fixed effects, R² jumps to 0.50+. Location explains a huge chunk of price variation that our structural features miss.
+
+## Coding Techniques
+
+```r
+# Create spatial object
+library(sf)
+housing_sf <- st_as_sf(housing, coords = c("longitude", "latitude"), crs = 4326)
+
+# Spatial join to assign neighborhoods
+housing_sf <- st_join(housing_sf, neighborhoods)
+
+# Basic model without spatial features
+baseline <- lm(price ~ sqft + bedrooms + bathrooms, data = housing)
+summary(baseline)  # R² ~ 0.13
+
+# Add neighborhood fixed effects
+fixed_effects <- lm(price ~ sqft + bedrooms + bathrooms + neighborhood, 
+                    data = housing)
+summary(fixed_effects)  # R² > 0.50
+
+# Check which neighborhood is the reference
+levels(housing$neighborhood)[1]  # first alphabetically
+
+# Distance to a point (e.g., downtown)
+downtown <- st_sfc(st_point(c(-71.0589, 42.3601)), crs = 4326)
+housing_sf$dist_downtown <- st_distance(housing_sf, downtown)
+
+# Buffer-based features (crime within 500m)
+housing_sf <- housing_sf %>%
+  st_transform(crs = 3365) %>%  # project first!
+  mutate(
+    crimes_500m = lengths(st_intersects(st_buffer(geometry, 500), crime_points))
+  )
+
+# k-nearest neighbor features
+library(FNN)
+coords <- st_coordinates(housing_sf)
+knn_result <- get.knnx(crime_coords, coords, k = 5)
+housing_sf$dist_5nn_crimes <- rowMeans(knn_result$nn.dist)
+```
+
+## Questions & Challenges
+
+- With many neighborhoods, fixed effects eat up degrees of freedom. When does this become a problem? 
+- The reference category choice is arbitrary (alphabetical default) but affects interpretation. Should I relevel to something meaningful like "city average"?
+- Spatial features (distance to X, crimes within buffer) require choosing parameters (which X? how big a buffer?). How do I decide without just trying everything?
+
+## Connections to Policy
+
+The jump in R² from adding neighborhoods is the story. Location matters as much as or more than physical characteristics. This has direct implications for property tax assessment, redlining analysis, and understanding housing markets.
+
+Price disparities across neighborhoods often reflect historical discrimination. The model doesn't explain why Back Bay is expensive and Roxbury isn't - it just captures that fact. Understanding the "why" requires deeper analysis of policy history, investment patterns, and structural racism.
+
+Spatial features can enable targeted interventions. If crime within 500m predicts lower prices, that quantifies the neighborhood-level cost of crime and justifies investment in crime reduction as an economic development strategy.
+
+## Reflection
+
+The fixed effects approach feels like cheating - you're just letting each neighborhood have its own intercept and calling it a day. But it works, and it captures real variation. The question is whether you learn anything from it beyond "location matters."
+
+I keep forgetting to project before doing spatial calculations. The workflow needs to be automatic: load data, check CRS, transform to projected, then do analysis.

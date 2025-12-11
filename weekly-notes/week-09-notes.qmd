@@ -1,0 +1,86 @@
+---
+title: "Week 9: Critical Perspectives on Predictive Policing"
+subtitle: "MUSA 5080 - Public Policy Analytics"
+date: 2025-11-03
+format:
+  html:
+    toc: true
+    code-fold: true
+---
+
+## Key Concepts
+
+This week shifted from "how do we build models" to "should we build them at all" - specifically for crime prediction. The Richardson et al. paper on "dirty data" was eye-opening.
+
+**The seductive promise vs. reality:**
+
+Predictive policing vendors sell efficiency, objectivity, and proactivity. The pitch sounds great: deploy resources where needed, remove human bias, prevent crime before it happens. But these claims assume the data accurately reflects crime (it doesn't), that past patterns predict future crime (they might just predict policing), and that technical solutions can fix social problems (they can't).
+
+**What "dirty data" actually means:**
+
+Beyond the usual data quality issues (missing values, wrong formats), Richardson et al. expand the definition to include data from corrupt, biased, or unlawful practices. This includes:
+
+- Fabricated/manipulated data: planted evidence, downgraded crime classifications to "juke the stats"
+- Systematically biased data: over-policing creates more recorded crime in some areas, racial profiling leads to disproportionate arrests
+- Missing data: unreported crimes (especially where communities distrust police), ignored complaints
+- Proxy problems: arrests ≠ crimes committed, calls for service ≠ actual need
+
+**The feedback loop problem:**
+
+This is what stuck with me most. If you train on arrest data from over-policed neighborhoods, your model predicts more crime there, police respond to predictions, make more arrests, which confirms the prediction. The model becomes self-fulfilling. It's not predicting crime - it's predicting policing.
+
+**Evolution of predictive policing:**
+
+The technical methods got more sophisticated over time (hotspot mapping → risk terrain modeling → ML → person-based prediction) but each generation built on the same flawed data foundation. More complexity doesn't fix fundamental data problems.
+
+## Coding Techniques
+
+This week was more conceptual than technical, but some relevant code patterns:
+
+```r
+# If you're working with crime data, consider:
+
+# 1. Check the data source - who collected it and how?
+# Is this arrest data? Calls for service? Reported crimes?
+
+# 2. Examine spatial distribution of data collection
+crime_data %>%
+  group_by(neighborhood) %>%
+  summarize(
+    arrests = n(),
+    population = first(population),
+    arrests_per_capita = arrests / population
+  )
+# Are some areas over-represented relative to population?
+
+# 3. Look at temporal patterns that might indicate policy changes
+crime_data %>%
+  group_by(year, crime_type) %>%
+  summarize(count = n()) %>%
+  # Sudden changes might reflect policy shifts, not actual crime changes
+```
+
+The technical methods themselves (Poisson regression for count data, kernel density estimation for hotspots) aren't wrong - the issue is what data feeds them.
+
+## Questions & Challenges
+
+- The case studies (Chicago, New Orleans, Maricopa County) show different failure modes. What institutional factors make some departments more prone to data manipulation?
+- Consent decrees supposedly address police misconduct, but do they actually clean the historical data? Can you "fix" a dataset collected under biased practices?
+- Is there any ethical way to do crime prediction, or is the entire project fundamentally flawed?
+
+## Connections to Policy
+
+This week was entirely about policy implications:
+
+- A statistically "good" model can be socially harmful - prediction accuracy isn't the only metric that matters
+- Consent decrees are legal agreements following DOJ investigations of police misconduct. They address behavior going forward but don't fix historical data already feeding algorithms
+- The 13 cities studied had documented police misconduct but continued using predictive tools trained on data from those periods
+- "Techno-solutionism" - the belief that complex social problems can be fixed with algorithms - is dangerous when the underlying data reflects structural inequalities
+
+The Richardson paper's key point: we need to think about data quality not just in technical terms but in terms of the social processes that generated the data.
+
+## Reflection
+
+This week changed how I think about the work we're doing in this class. It's easy to get caught up in improving R² or reducing RMSE and forget to ask whether the model should exist at all. The crime prediction case is extreme, but the same questions apply to other domains - housing, education, healthcare. What biases are baked into our training data? Who benefits from our predictions and who is harmed?
+
+The discussion format was effective. Reading about Chicago's Strategic Subject List and how it scored people based on network connections to prior victims/offenders was disturbing. It's not that the math is wrong - it's that the entire framing is wrong.

@@ -1,0 +1,89 @@
+---
+title: "Week 5: Introduction to Linear Regression"
+subtitle: "MUSA 5080 - Public Policy Analytics"
+date: 2025-10-06
+format:
+  html:
+    toc: true
+    code-fold: true
+---
+
+## Key Concepts
+
+First modeling week. The setup: we have outcome Y and predictors X, and we're trying to estimate the function that connects them. Y = f(X) + ε, where ε is the stuff we can't explain.
+
+**Prediction vs. Inference:**
+
+Two different goals. Prediction just wants accurate forecasts - don't care why, just want to know what. Inference wants to understand relationships - does X actually affect Y, and by how much? Sometimes you need both, but they can conflict. A complex model might predict well but be impossible to interpret.
+
+**Parametric vs. Non-parametric:**
+
+Parametric assumes a functional form (like linear). You're betting that the relationship is roughly linear, then estimating the parameters. Non-parametric lets the data determine the shape. More flexible but needs more data and can overfit.
+
+**OLS regression:**
+
+The workhorse. Minimizes sum of squared residuals to find the best-fit line. The coefficients tell you: a one-unit change in X is associated with a β-unit change in Y, holding other variables constant. R² tells you what proportion of variance you've explained.
+
+**But R² can mislead:**
+
+A model can have decent R² and still be garbage for prediction. It might overfit the training data, violate assumptions, or miss important nonlinearities. Always check the actual predictions, not just summary statistics.
+
+**Train/test splits:**
+
+The key insight: evaluate your model on data it hasn't seen. Split your data, train on one part, test on the other. If performance drops a lot on test data, you're probably overfitting. Cross-validation takes this further - multiple train/test splits, average the results.
+
+## Coding Techniques
+
+```r
+# Fit a linear model
+model <- lm(price ~ sqft + bedrooms + age, data = housing)
+summary(model)
+
+# Train/test split
+set.seed(123)  # reproducibility
+train_idx <- sample(1:nrow(housing), size = 0.7 * nrow(housing))
+train <- housing[train_idx, ]
+test <- housing[-train_idx, ]
+
+model <- lm(price ~ sqft + bedrooms, data = train)
+
+# Predict on test set
+test$predicted <- predict(model, newdata = test)
+
+# Calculate RMSE
+rmse <- sqrt(mean((test$price - test$predicted)^2))
+
+# Cross-validation with caret
+library(caret)
+ctrl <- trainControl(method = "cv", number = 10)
+cv_model <- train(price ~ sqft + bedrooms, data = housing, 
+                  method = "lm", trControl = ctrl)
+cv_model$results$RMSE
+
+# Diagnostic plots
+plot(model)  # gives you residuals vs fitted, Q-Q plot, etc.
+
+# Breusch-Pagan test for heteroscedasticity
+library(lmtest)
+bptest(model)
+```
+
+## Questions & Challenges
+
+- How do I decide what variables to include? Just throw everything in and see what's significant? That feels wrong.
+- The diagnostic plots show patterns in residuals. What do I actually do about it? Add polynomial terms? Transform variables?
+- Cross-validation gives different RMSE each time unless I set a seed. How much variation is acceptable?
+
+## Connections to Policy
+
+Model interpretation matters for policy. If your housing price model shows a $50/sqft coefficient, that's actionable information for assessors. But if the model is misspecified, that number is misleading and could lead to unfair assessments.
+
+The healthcare algorithm example from class was disturbing. A model can be statistically "good" (high R², low RMSE) but ethically terrible if it systematically disadvantages certain groups. Prediction accuracy isn't the only thing that matters.
+
+Also: outliers in policy data often represent the communities we should care most about. Dropping them for model fit might mean ignoring the people who need the most help.
+
+## Reflection
+
+The train/test split logic makes sense now. Of course you should evaluate on unseen data - otherwise you're just measuring memorization. I've been doing this wrong in other classes, evaluating on the same data I trained on.
+
+The "held constant" interpretation of regression coefficients is tricky. In observational data, you can't actually hold things constant. The coefficient is really about the correlation structure in your data, which may or may not reflect causal relationships.

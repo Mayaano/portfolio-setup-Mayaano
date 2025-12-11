@@ -14,7 +14,27 @@ website:
           - text: "All Notes"
             href: weekly-notes/index.html
           - text: "Week 1 - Course Intro"
-            href: weekly-notes/week-01-notes.qmd
+            href: weekly-notes/week-01-notes.html
+          - text: "Week 2 - Algorithms & Census Data"
+            href: weekly-notes/week-02-notes.html
+          - text: "Week 3 - Data Visualization"
+            href: weekly-notes/week-03-notes.html
+          - text: "Week 4 - Spatial Data & GIS"
+            href: weekly-notes/week-04-notes.html
+          - text: "Week 5 - Linear Regression"
+            href: weekly-notes/week-05-notes.html
+          - text: "Week 6 - Spatial ML & Fixed Effects"
+            href: weekly-notes/week-06-notes.html
+          - text: "Week 7 - Model Diagnostics"
+            href: weekly-notes/week-07-notes.html
+          - text: "Week 9 - Predictive Policing Ethics"
+            href: weekly-notes/week-09-notes.html
+          - text: "Week 10 - Logistic Regression"
+            href: weekly-notes/week-10-notes.html
+          - text: "Week 11 - Space-Time Prediction"
+            href: weekly-notes/week-11-notes.html
+          - text: "Week 12 - Neighborhood Change"
+            href: weekly-notes/week-12-notes.html
       
       - text: "Assignments"
         menu:
@@ -22,10 +42,14 @@ website:
             href: assignments/assignment1/assignment1.html
           - text: "Assignment 2"
             href: assignments/assignment2/Fang_Zhe_Assignment2.html
+          - text: "Midterm"
+            href: assignments/assignment3/Yang_Chen_Fang_Gao_Xiang_Zhao_Appendix.html
           - text: "Assignment 4"
             href: assignments/assignment4/Fang_Zhe_Assignment4.html
           - text: "Assignment 5"
             href: assignments/assignment5/HW5.html
+          - text: "Final"
+            href: assignments/final/final.html
 
 format:
   html:

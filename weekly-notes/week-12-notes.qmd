@@ -1,0 +1,129 @@
+---
+title: "Week 12: Neighborhood Change & Sequence Analysis"
+subtitle: "MUSA 5080 - Public Policy Analytics"
+date: 2025-11-24
+format:
+  html:
+    toc: true
+    code-fold: true
+---
+
+## Key Concepts
+
+Final topic: understanding neighborhood change as a process, not just comparing snapshots. The "DNA metaphor" captures it well - just like genetic sequences encode biological history, neighborhood sequences encode trajectories of change.
+
+**The problem with snapshots:**
+
+Looking at a neighborhood in 2010 and labeling it "gentrifying" misses crucial context. Did it steadily improve since 1970? Decline then recover? Cycle through ups and downs? Same 2010 status, completely different histories, potentially different policy needs.
+
+**The methodological workflow (5 steps):**
+
+1. K-means clustering: classify neighborhoods at each time point into types (e.g., White, Black, Hispanic, Mixed)
+2. Create sequences: string together each tract's cluster membership over time (White → White → Hispanic → Hispanic)
+3. Measure dissimilarity: compare sequences using OMstrans (transition-aware optimal matching)
+4. Cluster sequences: group tracts with similar trajectories
+5. Map results: visualize which trajectory types occur where
+
+**K-means for neighborhood classification:**
+
+This is unsupervised learning - we don't tell it what makes a "gentrifying" neighborhood, it finds patterns in the data. Input variables include socioeconomic (% college, unemployment, poverty), housing (home values, owner-occupied %), and demographic factors (recent movers, vacancy).
+
+Key insight: cluster ALL years together so a "Struggling" neighborhood in 1980 has the same meaning as "Struggling" in 2010. Ensures temporal consistency.
+
+Choosing k is "more art than science." Mathematical optimum (elbow method, silhouette) might give k=3 but k=6 provides more nuance. The tutorial example found k=3 grouped basically by race alone - not very informative.
+
+**Sequence dissimilarity with OMstrans:**
+
+Standard optimal matching counts "edits" to transform one sequence into another. OMstrans focuses on transitions specifically:
+
+- Standard: [White, White, Hispanic, Hispanic]
+- OMstrans: [White→White, White→Hispanic, Hispanic→Hispanic]
+
+This captures WHEN the transition happened (early vs. late), not just that it happened.
+
+**Classic urban theories tested:**
+
+Chicago School predicted regular spatial patterns - concentric rings of decline and renewal spreading from downtown. LA School predicted chaotic fragmentation with no regular patterns. The data shows both can be right depending on the city. Chicago shows persistent rings; LA is more fragmented.
+
+## Coding Techniques
+
+```r
+# Step 1: K-means clustering
+library(cluster)
+
+# Standardize variables (z-scores within metro)
+census_scaled <- census %>%
+  group_by(year) %>%
+  mutate(across(c(pct_college, unemployment, median_income), scale)) %>%
+  ungroup()
+
+# Fit k-means on all years together
+set.seed(123)
+kmeans_result <- kmeans(census_scaled[, vars_to_cluster], centers = 6, nstart = 25)
+census_scaled$cluster <- kmeans_result$cluster
+
+# Evaluate with elbow plot
+wss <- sapply(2:10, function(k) {
+  kmeans(census_scaled[, vars_to_cluster], k, nstart = 25)$tot.withinss
+})
+plot(2:10, wss, type = "b")
+
+# Step 2: Create sequences
+library(TraMineR)
+
+census_wide <- census_scaled %>%
+  select(tract, year, cluster) %>%
+  pivot_wider(names_from = year, values_from = cluster)
+
+seq_data <- seqdef(
+  census_wide,
+  var = c("1980", "1990", "2000", "2010", "2020"),
+  labels = c("White", "Black", "Hispanic", "Asian", "Mixed", "Diverse")
+)
+
+# Visualize all sequences
+seqplot(seq_data, type = "I")  # Index plot
+
+# Step 3: OMstrans dissimilarity
+submat <- seqsubm(seq_data, method = "TRATE", transition = "both")
+dist_omstrans <- seqdist(seq_data, method = "OMstrans", indel = 1, 
+                          sm = submat, otto = 0.1)
+
+# Step 4: Hierarchical clustering of sequences
+hc <- hclust(as.dist(dist_omstrans), method = "ward.D2")
+census_wide$trajectory <- cutree(hc, k = 14)
+
+# Step 5: Map it
+ggplot(tracts_sf %>% left_join(census_wide)) +
+  geom_sf(aes(fill = factor(trajectory))) +
+  theme_void()
+```
+
+The `TraMineR` package does the heavy lifting for sequence analysis. The `seqsubm()` with "TRATE" sets substitution costs based on transition frequencies - rare transitions cost more.
+
+## Questions & Challenges
+
+- How sensitive are results to the choice of k in the initial clustering? Would different k produce different trajectory types?
+- The OMstrans parameters (indel, otto) seem important but I don't fully understand how to tune them
+- With only 5 time points (census decades), sequences are pretty short. Does this limit what patterns we can detect?
+
+## Connections to Policy
+
+The big payoff is targeted intervention:
+
+- Neighborhood A: Stable → Declining → Struggling → Gentrifying
+  - Policy: Anti-displacement, affordable housing preservation
+- Neighborhood B: Struggling → Struggling → Struggling → Gentrifying  
+  - Policy: Infrastructure investment, longtime resident wealth-building
+
+Same current status, different histories, different policy responses.
+
+Also tests urban theory empirically. The Chicago vs. LA comparison shows that classic urban models (Burgess concentric zones, Hoyt sectors) still describe some cities well, while others follow the fragmented LA School pattern. One-size-fits-all urban policy probably doesn't work.
+
+## Reflection
+
+This felt like a capstone topic pulling together clustering, spatial analysis, and temporal thinking. The DNA metaphor is elegant - neighborhoods have trajectories that encode their history, and similar trajectories might reflect similar underlying processes.
+
+The unsupervised approach is both liberating and concerning. We're not imposing definitions of "gentrification" or "decline" - the algorithm finds natural groupings. But that also means the results depend heavily on what variables we include and how we cluster. Different choices, different stories.
+
+The 14 NYC trajectory clusters in the tutorial showed just how varied neighborhood change can be. Some are stable forever, some flip once, some cycle. The spatial patterns of where these trajectories occur tell us something about urban structure that snapshot analysis misses.

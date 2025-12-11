@@ -1,0 +1,68 @@
+---
+title: "Week 3: Data Visualization & Exploratory Analysis"
+subtitle: "MUSA 5080 - Public Policy Analytics"
+date: 2025-09-22
+format:
+  html:
+    toc: true
+    code-fold: true
+---
+
+## Key Concepts
+
+This week was about looking at your data before doing anything fancy with it. The Anscombe's Quartet example drove this home - four datasets with identical means, variances, correlations, and regression lines that look completely different when you actually plot them. One is linear, one is curved, one has an outlier pulling the line, one is just vertical with one outlier. Summary statistics can lie.
+
+**The Grammar of Graphics:**
+
+ggplot2 builds plots in layers: data → aesthetics → geometries → extras. It sounds abstract but it clicks once you do it. You're mapping data columns to visual properties (x position, y position, color, size) then choosing how to draw them (points, lines, bars).
+
+**Data quality and uncertainty:**
+
+The Jurjevich et al. paper was sobering. Only 27% of planners report margins of error when presenting census data. And in Portland, 72% of census tracts had unreliable child poverty estimates (CV > 40%). We're making resource allocation decisions based on shaky numbers and nobody's saying so.
+
+The Coefficient of Variation thresholds: under 12% is reliable, 12-40% is questionable, over 40% is basically guessing. I need to start flagging these.
+
+## Coding Techniques
+
+```r
+# Basic ggplot structure
+ggplot(data, aes(x = var1, y = var2)) +
+  geom_point() +
+  labs(title = "Title", x = "X Label", y = "Y Label") +
+  theme_minimal()
+
+# Aesthetics that depend on data go INSIDE aes()
+# Constants go outside
+ggplot(data, aes(x = income, y = life_expectancy, color = region)) +
+  geom_point(size = 3, alpha = 0.7)  # size and alpha are constants
+
+# Common geoms
+geom_point()      # scatter plots
+geom_histogram()  # distributions (one variable)
+geom_boxplot()    # compare distributions across groups
+geom_line()       # time series or trends
+
+# Combining data with left_join
+combined <- left_join(demographics, economic_data, by = "tract_id")
+# Always check: did the number of rows change? Do I have unexpected NAs?
+```
+
+The key mistake I keep making: putting constant values inside `aes()`. If you want all points to be blue, it's `geom_point(color = "blue")`, not `aes(color = "blue")`.
+
+## Questions & Challenges
+
+- When presenting to policymakers, how do you communicate uncertainty without undermining confidence in your analysis? "These numbers might be wrong" doesn't play well.
+- The CV thresholds feel arbitrary. Who decided 40%? Is there research behind this or just convention?
+- For outliers that represent real communities (like a very poor county), removing them for visualization purposes feels wrong but keeping them makes everything else hard to see.
+
+## Connections to Policy
+
+The ethical dimension here is real. The AICP Code of Ethics requires honest communication, which includes uncertainty. But in practice, most planners don't report margins of error. We're failing at this basic professional obligation.
+
+Bad visualizations cause real harm. Misleading scales, cherry-picked time periods, hidden uncertainty - these lead to misallocation of resources. Someone loses services they need because the data presentation made their community look better off than it actually is.
+
+## Reflection
+
+I'll be honest - before this week I didn't think much about reporting margins of error. I'd look at the ACS estimates and treat them as facts. The Portland child poverty example was a wake-up call. When 72% of your geographic units have unreliable estimates for a key variable, maybe you shouldn't be making maps from that variable at all.
+
+The visualization-as-detective-work framing is useful. What patterns exist? What's unusual? What questions does this raise? It's easy to jump to modeling before really understanding what you have.

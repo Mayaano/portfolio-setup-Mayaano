@@ -1,0 +1,79 @@
+---
+title: "Week 4: Spatial Data & GIS Operations"
+subtitle: "MUSA 5080 - Public Policy Analytics"
+date: 2025-09-29
+format:
+  html:
+    toc: true
+    code-fold: true
+---
+
+## Key Concepts
+
+Spatial data week. The big idea: geographic features are represented as points, lines, or polygons, each with geometry (where it is) and attributes (what it is). Schools are points, roads are lines, census tracts are polygons.
+
+**The sf package:**
+
+sf treats spatial data as a regular data.frame with a special geometry column. This means you can use all the tidyverse stuff you already know - `filter()`, `mutate()`, `group_by()` - on spatial data. Before sf, spatial analysis in R was painful. Now it's almost normal.
+
+**Spatial predicates - this tripped me up:**
+
+- `st_intersects()` - any overlap at all
+- `st_touches()` - share boundary but no interior overlap (like neighboring counties)
+- `st_within()` - completely inside
+- `st_contains()` - completely contains
+
+The trap: `st_intersects` will match a polygon with itself. If you're finding neighbors, you get the reference polygon back too. You need to filter it out.
+
+**Coordinate reference systems:**
+
+This is where I messed up on the assignment. Geographic coordinates (lat/lon, EPSG:4326) are fine for mapping but terrible for measuring distances or areas. For calculations, you need a projected system like State Plane (PA is EPSG:3365). I was getting weird distance results until I figured this out.
+
+## Coding Techniques
+
+```r
+# Load spatial data
+library(sf)
+tracts <- st_read("census_tracts.shp")
+# Or from tigris package
+tracts <- tigris::tracts(state = "PA", county = "Philadelphia")
+
+# Check and transform CRS
+st_crs(tracts)  # what is it?
+tracts_projected <- st_transform(tracts, crs = 3365)  # transform to State Plane
+
+# Spatial filtering
+philly_schools <- st_filter(all_schools, philly_boundary)
+# Default predicate is st_intersects
+
+# Spatial join - attach attributes from one layer to another based on location
+tracts_with_crime <- st_join(tracts, crime_points)
+
+# Distance calculations - NEED PROJECTED CRS
+distances <- st_distance(points1, points2)
+
+# Buffers
+school_buffers <- st_buffer(schools, dist = 1000)  # 1000 meters if projected
+
+# The dot placeholder in pipes - this got me
+pa_counties %>%
+  mutate(area = st_area(.))  # . refers to the data being piped
+```
+
+## Questions & Challenges
+
+- When should I use State Plane vs UTM vs something else? The answer seems to be "depends on your study area" but I want a clearer decision rule.
+- Edge effects: if I'm buffering near the edge of my study area, I'm missing things outside the boundary. How do I handle this?
+- The lecture mentioned spatial autocorrelation violates independence assumptions. Does this mean standard regression doesn't work on spatial data? What do I use instead?
+
+## Connections to Policy
+
+The "where" question transforms analysis. "Which communities are poorest?" becomes more actionable when you can see spatial clusters, proximity to resources, transportation access. It's the difference between a table and a map.
+
+Environmental justice is inherently spatial - are pollution sources near vulnerable communities? Facility location decisions (where to put a clinic, school, fire station) need spatial optimization. Rideshare algorithms avoiding certain neighborhoods is a spatial equity issue that planners need to understand.
+
+## Reflection
+
+Getting projections right is boring but essential. I spent an hour debugging distance calculations before realizing I was using lat/lon coordinates. The numbers looked plausible but were wrong. Now I have a checklist: check CRS, transform if needed, verify, then analyze.
+
+The `st_filter()` vs `st_intersection()` distinction matters: filter selects complete features, intersection clips and creates new geometries. I kept confusing these.

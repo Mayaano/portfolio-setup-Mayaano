@@ -1,0 +1,92 @@
+---
+title: "Week 10: Logistic Regression for Binary Outcomes"
+subtitle: "MUSA 5080 - Public Policy Analytics"
+date: 2025-11-10
+format:
+  html:
+    toc: true
+    code-fold: true
+---
+
+## Key Concepts
+
+Switched gears from continuous outcomes (house prices) to binary outcomes (yes/no, 0/1). Linear regression doesn't work here because predictions can go below 0 or above 1, which makes no sense for probabilities.
+
+**Why logistic regression:**
+
+- The logistic function (sigmoid curve) constrains predictions between 0 and 1
+- Instead of predicting Y directly, we predict the probability that Y = 1
+- The S-shaped curve means the effect of predictors isn't constant - it's steepest in the middle and flattens at extremes
+
+**The logit transformation:**
+
+This is the key conceptual piece. We work with log-odds, not raw probabilities:
+
+- Odds = p / (1-p). If probability is 0.75, odds are 0.75/0.25 = 3:1
+- Log-odds (logit) = ln(odds). This creates a linear relationship with predictors
+- Coefficients are in log-odds units, which is hard to interpret directly
+- Exponentiate coefficients to get odds ratios: exp(β). OR > 1 means predictor increases odds, OR < 1 means it decreases odds
+
+**Policy applications:**
+
+The slides listed tons of examples: will someone reoffend (recidivism)? will they show up for court (flight risk)? will a building be demolished (blight prediction)? will a household participate in a program (uptake)? All binary outcomes that matter for resource allocation.
+
+## Coding Techniques
+
+```r
+# Fit logistic regression with glm()
+model <- glm(
+  outcome ~ predictor1 + predictor2 + predictor3,
+  data = mydata,
+  family = "binomial"  # This specifies logistic regression
+)
+
+summary(model)
+
+# Get predicted probabilities
+mydata$predicted_prob <- predict(model, type = "response")
+
+# Convert to binary predictions using threshold
+mydata$predicted_class <- ifelse(mydata$predicted_prob > 0.5, 1, 0)
+
+# Confusion matrix
+table(Predicted = mydata$predicted_class, Actual = mydata$outcome)
+
+# Calculate odds ratios from coefficients
+exp(coef(model))
+
+# Confidence intervals for odds ratios
+exp(confint(model))
+```
+
+The spam email example was a nice toy case: predict spam (1) vs. legitimate (0) from exclamation marks, whether it contains "free", and email length.
+
+**Important distinction from linear regression:**
+
+- Use `glm()` not `lm()`
+- Set `family = "binomial"`
+- For predictions, use `type = "response"` to get probabilities (not log-odds)
+- Interpretation shifts from "one unit increase in X changes Y by β" to "one unit increase in X multiplies odds by exp(β)"
+
+## Questions & Challenges
+
+- How do you choose the probability threshold for classification? 0.5 is the default but might not be appropriate if classes are imbalanced or if false positives/negatives have different costs
+- The coefficients in the spam example had huge values and standard errors. Is that a sign of perfect separation or some other problem?
+- For policy applications, which metric matters more - accuracy, sensitivity, specificity, or something else?
+
+## Connections to Policy
+
+The choice of threshold is inherently a policy decision, not just a technical one. If you're predicting flight risk for bail decisions:
+
+- Low threshold: flag more people as high risk → more people detained → more false positives (people detained who would have shown up)
+- High threshold: flag fewer people → more people released → more false negatives (people released who don't show up)
+
+The costs aren't symmetric. Detaining someone who would have appeared has different consequences than releasing someone who flees. The "optimal" threshold depends on how you weigh these errors, which is a values question.
+
+Also, the COMPAS recidivism case (from earlier weeks) is a logistic regression at heart. The debates about fairness and bias apply here too.
+
+## Reflection
+
+Logistic regression feels like unlocking a whole new category of problems. So many policy-relevant questions are binary: eligible/ineligible, approved/denied, participated/didn't participate. The math is a bit more abstract (working in log-odds space) but the intuition carries over from linear regression.
+
+The odds ratio interpretation takes getting used to. "A one-unit increase in X multiplies the odds by 1.5" is harder to parse than "increases Y by 10 units." But it's the right tool for the job.

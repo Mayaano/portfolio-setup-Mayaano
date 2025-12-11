@@ -1,0 +1,81 @@
+---
+title: "Week 7: Model Diagnostics & Spatial Autocorrelation"
+subtitle: "MUSA 5080 - Public Policy Analytics"
+date: 2025-10-21
+format:
+  html:
+    toc: true
+    code-fold: true
+---
+
+## Key Concepts
+
+This week focused on how to diagnose whether our regression models are missing important spatial information. The core question: if our errors cluster geographically, we're probably missing something.
+
+**Model errors and what they tell us:**
+
+- Prediction error is simply ŷ - y (predicted minus actual). In house price models, this shows where we over- or under-predict.
+- Random scatter of errors = good. The model captures the key relationships.
+- Clustered errors = bad. We're systematically wrong in certain areas, which means location matters in ways we haven't captured yet.
+- If you map your residuals and see blue clusters (under-predict) or red clusters (over-predict), that's a signal to add more spatial features.
+
+**Moran's I - the key diagnostic:**
+
+- Measures spatial autocorrelation on a scale from -1 to +1. Positive values mean clustering (similar values near each other), zero means random, negative means dispersion.
+- The formula looks intimidating but the intuition is simple: "when I'm above average, are my neighbors also above average?"
+- For each pair of neighbors, multiply their deviations from the mean. If both are above (or both below) average, the product is positive. Sum these up and normalize.
+- Applied to model residuals: significant positive Moran's I means our errors cluster spatially → we need more spatial features.
+
+**Practical interpretation:**
+
+The worked example with 5 houses in a row made it click for me. Houses A and B both had positive errors (over-predicted), D and E both had negative errors (under-predicted). The products A×B and D×E are both positive because similar neighbors. The sum of products being large and positive indicates clustering.
+
+## Coding Techniques
+
+```r
+# Suppress progress bars in rendered documents
+options(tigris_use_cache = TRUE)
+options(tigris_progress = FALSE)
+# Or add progress = FALSE to each get_acs() call
+
+# Calculate prediction errors
+data <- data %>%
+  mutate(
+    predicted = predict(model, .),
+    error = predicted - actual_value,
+    abs_error = abs(error),
+    pct_error = abs(error) / actual_value
+  )
+
+# Create spatial weights for Moran's I (k nearest neighbors)
+library(spdep)
+coords <- st_coordinates(data_sf)
+neighbors <- knn2nb(knearneigh(coords, k = 5))
+weights <- nb2listw(neighbors, style = "W")
+
+# Calculate spatial lag of errors (average of neighbors' errors)
+data$error_lag <- lag.listw(weights, data$error)
+
+# Test for spatial autocorrelation
+moran.test(data$error, weights)
+```
+
+The scatter plot of error vs. spatial lag of error is really useful. If there's a strong positive relationship, your errors are spatially autocorrelated.
+
+## Questions & Challenges
+
+- How do you decide on the number of neighbors (k) for the weights matrix? I used k=5 but is there a principled way to choose?
+- The assignment mentioned that clustered errors could indicate "non-stationarity" where relationships vary across space. How would we model that?
+- When Moran's I is significant, what's the best strategy - add more spatial features, use neighborhood fixed effects, or something else?
+
+## Connections to Policy
+
+Spatial autocorrelation in model errors has direct policy implications. If our housing price model systematically under-predicts in certain neighborhoods, property tax assessments based on that model would be unfair to residents there. The errors themselves might correlate with race or income, compounding existing inequities.
+
+The bigger lesson: a model with good overall R² can still be deeply problematic if it's wrong in systematic, spatially-patterned ways. Mapping residuals should be standard practice.
+
+## Reflection
+
+The connection between Tobler's First Law and model diagnostics finally made sense this week. We've been told "near things are more related" but now I see how to operationalize that as a diagnostic check. The Moran's I calculation demystified something that seemed like a black box before.
+
+The housekeeping note about `progress = FALSE` is worth remembering - those progress bars make rendered documents look unprofessional.
