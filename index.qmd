@@ -18,7 +18,7 @@ Key focus: reproducibility, version control, and transparent policy analytics.
 ## Portfolio Structure
 
 -   **Weekly Notes:** Reflections on learning, key takeaways, and challenges\
--   **Labs:** Applied assignments and data-driven policy analysis\
+-   **Labs/Assignments:** Applied assignments and data-driven policy analysis\
 -   **Final Project:** A capstone policy modeling challenge
 
 ## About Me
