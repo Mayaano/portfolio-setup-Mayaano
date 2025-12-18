@@ -48,8 +48,10 @@ website:
             href: assignments/assignment4/Fang_Zhe_Assignment4.html
           - text: "Assignment 5"
             href: assignments/assignment5/HW5.html
-          - text: "Final"
-            href: assignments/final/final.html
+          - text: "Final Project Analysis"
+            href: assignments/final_project_analysis_process/eviction_data_analysis.html
+          - text: "Final Project Presentation"
+            href: assignments/final_project_presentation/eviction_presentation.html
 
 format:
   html:

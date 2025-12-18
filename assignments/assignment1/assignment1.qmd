@@ -2,7 +2,7 @@
 title: "Assignment 1: Census Data Quality for Policy Decisions"
 subtitle: "Evaluating Data Reliability for Algorithmic Decision-Making"
 author: "Zhe Fang"
-date: today
+date: "December 18, 2025"
 format: 
   html:
     code-fold: true
@@ -373,7 +373,7 @@ county_recommendations %>%
 
 **Data Sources:** 
 - U.S. Census Bureau, American Community Survey 2018-2022 5-Year Estimates
-- Retrieved via tidycensus R package on `r format(Sys.Date(), "%B %d, %Y")`
+- Retrieved via tidycensus R package on December 18, 2025
 
 **Reproducibility:** 
 - All analysis conducted in R version `r paste(R.version$major, R.version$minor, sep = ".")`
