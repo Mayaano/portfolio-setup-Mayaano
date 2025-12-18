@@ -194,7 +194,7 @@ Eviction filings exhibit marked geographic concentration in Philadelphia. North 
 
 ```{r}
 #| fig-align: "center"
-#| out-width: "100px"
+#| out-width: "80%"
 #| echo: false
 
 knitr::include_graphics("trends.png")
@@ -210,11 +210,11 @@ Volatility: Coefficient of variation decreased over time, showing market normali
 Implications
 Data supports stable eviction environment with predictable monthly volumes suitable for forecasting models.
 
-# trends
+# Philadelphia Census Tracts Analysis
 
 ```{r}
 #| fig-align: "center"
-#| out-width: "100px"
+#| out-width: "80%"
 #| echo: false
 
 knitr::include_graphics("price.png")
